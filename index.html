@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QuickChat HD — Lossless P2P Messenger</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+    <!-- Lobby / Connect Screen -->
+    <div id="connectScreen" class="screen">
+        <div class="auth-card">
+            <div class="logo-badge">💎 LOSSLESS FULL-HD P2P</div>
+            <h1>QuickChat HD</h1>
+            <p class="subtitle">Zero Compression • HD Photos, Videos & Docs • Private Chat</p>
+
+            <input type="text" id="usernameInput" placeholder="Apna naam likho..." value="sachiin" maxlength="16">
+
+            <div class="tabs">
+                <button id="createTabBtn" class="tab active" onclick="switchTab('create')">Create Room</button>
+                <button id="joinTabBtn" class="tab" onclick="switchTab('join')">Join Room</button>
+            </div>
+
+            <!-- Create Room Panel -->
+            <div id="createPanel" class="panel">
+                <p class="hint">Dost ko yeh 4-digit Room Code bhejo:</p>
+                <div class="code-box">
+                    <span id="myRoomCode">----</span>
+                    <button id="copyCodeBtn" title="Copy Code">📋</button>
+                </div>
+                <div id="hostStatus" class="status-pill">⏳ Generating Room ID...</div>
+            </div>
+
+            <!-- Join Room Panel -->
+            <div id="joinPanel" class="panel hidden">
+                <p class="hint">Dost ka 4-digit Room Code daalo:</p>
+                <input type="tel" id="joinCodeInput" placeholder="e.g. 4829" maxlength="4">
+                <button id="connectBtn" class="primary-btn">CONNECT NOW</button>
+                <div id="joinStatus" class="status-text"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Chat Screen -->
+    <div id="chatScreen" class="screen hidden">
+        <header class="chat-header">
+            <div class="peer-info">
+                <div class="avatar" id="peerAvatar">F</div>
+                <div>
+                    <h3 id="peerName">Friend</h3>
+                    <span id="peerStatus" class="online-text">● Online (HD Ready)</span>
+                </div>
+            </div>
+            <button id="leaveBtn" class="leave-btn">Exit</button>
+        </header>
+
+        <!-- Transfer Progress Bar -->
+        <div id="transferBar" class="transfer-bar hidden">
+            <span id="transferText">Sending File... 0%</span>
+            <div class="progress-bg"><div id="progressFill" class="progress-fill"></div></div>
+        </div>
+
+        <!-- Messages Area -->
+        <main id="messagesContainer" class="messages-area">
+            <div class="system-msg">💎 Direct P2P Connected! Photos, Videos & Documents are sent in 100% Original Quality without compression.</div>
+        </main>
+
+        <!-- Fullscreen HD Image Preview Modal -->
+        <div id="imageModal" class="modal hidden" onclick="closeModal()">
+            <img id="modalImg" src="" alt="Full HD Preview">
+            <p class="modal-hint">Tap anywhere to close</p>
+        </div>
+
+        <!-- Quick Emojis -->
+        <div class="emoji-bar">
+            <button onclick="sendEmoji('😂')">😂</button>
+            <button onclick="sendEmoji('❤️')">❤️</button>
+            <button onclick="sendEmoji('🔥')">🔥</button>
+            <button onclick="sendEmoji('👍')">👍</button>
+            <button onclick="sendEmoji('😎')">😎</button>
+            <button onclick="sendEmoji('📸')">📸</button>
+        </div>
+
+        <!-- Message Input Bar -->
+        <footer class="chat-footer">
+            <label for="fileInput" class="attach-btn" title="Send Photo, Video, or Document">📎</label>
+            <input type="file" id="fileInput" class="hidden">
+            <input type="text" id="msgInput" placeholder="Message likho..." autocomplete="off">
+            <button id="sendBtn" class="send-btn">➤</button>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
