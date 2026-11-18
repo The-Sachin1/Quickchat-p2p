@@ -308,3 +308,12 @@ document.getElementById('msgInput').addEventListener('keypress', (e) => {
 });
 document.getElementById('sendBtn').addEventListener('click', sendMessage);
 document.getElementById('leaveBtn').addEventListener('click', () => location.reload());
+// Mobile Keyboard Open/Close Viewport Fix
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+        const chatScreen = document.getElementById('chatScreen');
+        chatScreen.style.height = `${window.visualViewport.height}px`;
+        const container = document.getElementById('messagesContainer');
+        container.scrollTop = container.scrollHeight;
+    });
+}
