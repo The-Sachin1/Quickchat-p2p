@@ -5,7 +5,10 @@ let peer = null;
 let conn = null;
 let myRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
 let typingTimeout = null;
+
+// Reply & Edit State
 let activeReplyText = null;
+let editingMsgId = null;
 let msgCounter = 0;
 
 // Themes & Icebreakers
@@ -27,7 +30,7 @@ let audioChunks = [];
 let isRecording = false;
 
 // Incoming File Buffer
-let incomingFile = { chunks: [], receivedBytes: 0, totalBytes: 0, fileName: '', mimeType: '', time: '' };
+let incomingFile = { chunks: [], receivedBytes: 0, totalBytes: 0, fileName: '', mimeType: '', time: '', msgId: '' };
 
 // Sound Effects
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -110,7 +113,7 @@ function setupConnection() {
             if (incomingFile.receivedBytes >= incomingFile.totalBytes) {
                 const fullBlob = new Blob(incomingFile.chunks, { type: incomingFile.mimeType });
                 const blobUrl = URL.createObjectURL(fullBlob);
-                appendUniversalFile(blobUrl, incomingFile.fileName, incomingFile.mimeType, incomingFile.totalBytes, 'received', incomingFile.time);
+                appendUniversalFile(blobUrl, incomingFile.fileName, incomingFile.mimeType, incomingFile.totalBytes, 'received', incomingFile.time, incomingFile.msgId);
                 playPopSound();
                 updateProgress(false);
                 incomingFile.chunks = [];
@@ -124,6 +127,10 @@ function setupConnection() {
         } else if (data.type === 'chat') {
             appendMessage(data.text, 'received', data.time, data.msgId, data.replyTo);
             playPopSound();
+        } else if (data.type === 'edit') {
+            applyEditToMessage(data.msgId, data.newText);
+        } else if (data.type === 'unsend') {
+            applyUnsendToMessage(data.msgId);
         } else if (data.type === 'react') {
             toggleHeartOnMsg(data.msgId);
             playPopSound();
@@ -133,7 +140,7 @@ function setupConnection() {
             appendGameCard(data.prompt);
             playPopSound();
         } else if (data.type === 'file-meta') {
-            incomingFile = { chunks: [], receivedBytes: 0, totalBytes: data.size, fileName: data.name, mimeType: data.mime, time: data.time };
+            incomingFile = { chunks: [], receivedBytes: 0, totalBytes: data.size, fileName: data.name, mimeType: data.mime, time: data.time, msgId: data.msgId };
             updateProgress(true, `Receiving ${data.name}... 0%`, 0);
         } else if (data.type === 'typing') {
             document.getElementById('peerStatus').textContent = data.isTyping ? "typing..." : "● Online • E2E Encrypted";
@@ -154,7 +161,7 @@ document.getElementById('themeBtn').addEventListener('click', () => {
     if (conn && conn.open) conn.send({ type: 'theme', theme: newTheme });
 });
 
-// Fun Icebreaker / Truth & Dare Game
+// Fun Icebreaker Game
 document.getElementById('gameBtn').addEventListener('click', () => {
     const prompt = ICEBREAKERS[Math.floor(Math.random() * ICEBREAKERS.length)];
     appendGameCard(prompt);
@@ -199,11 +206,21 @@ document.getElementById('micBtn').addEventListener('click', async () => {
     }
 });
 
-// Send Message & Reply Logic
+// Send or Save Edited Message
 function sendMessage() {
     const input = document.getElementById('msgInput');
     const text = input.value.trim();
     if (!text || !conn || !conn.open) return;
+
+    // If currently editing an existing message
+    if (editingMsgId) {
+        applyEditToMessage(editingMsgId, text);
+        conn.send({ type: 'edit', msgId: editingMsgId, newText: text });
+        input.value = '';
+        cancelAction();
+        toggleSendMicButtons();
+        return;
+    }
 
     const time = getCurrentTime();
     const msgId = `msg-${Date.now()}-${++msgCounter}`;
@@ -212,7 +229,7 @@ function sendMessage() {
 
     appendMessage(text, 'sent', time, msgId, activeReplyText);
     input.value = '';
-    cancelReply();
+    cancelAction();
     toggleSendMicButtons();
 }
 
@@ -224,21 +241,80 @@ function sendEmoji(emoji) {
     appendMessage(emoji, 'sent', time, msgId, null);
 }
 
-function setReply(text) {
+// Reply, Edit & Unsend Handlers
+function startReply(text) {
+    cancelAction();
     activeReplyText = text;
-    document.getElementById('replyPreviewText').textContent = text;
-    document.getElementById('replyBar').classList.remove('hidden');
+    document.getElementById('actionLabel').textContent = "Replying to:";
+    document.getElementById('actionPreviewText').textContent = text;
+    document.getElementById('actionBar').classList.remove('hidden');
     document.getElementById('msgInput').focus();
 }
 
-function cancelReply() {
+function startEdit(msgId) {
+    const bubble = document.getElementById(msgId);
+    if (!bubble || bubble.classList.contains('unsent-bubble')) return;
+    const textEl = bubble.querySelector('.msg-text');
+    if (!textEl) return;
+
+    cancelAction();
+    editingMsgId = msgId;
+    document.getElementById('actionLabel').textContent = "✏️ Editing message:";
+    document.getElementById('actionPreviewText').textContent = textEl.textContent;
+    document.getElementById('actionBar').classList.remove('hidden');
+
+    const input = document.getElementById('msgInput');
+    input.value = textEl.textContent;
+    input.focus();
+    toggleSendMicButtons();
+}
+
+function unsendMessage(msgId) {
+    applyUnsendToMessage(msgId);
+    if (conn && conn.open) {
+        conn.send({ type: 'unsend', msgId });
+    }
+}
+
+function applyEditToMessage(msgId, newText) {
+    const bubble = document.getElementById(msgId);
+    if (!bubble || bubble.classList.contains('unsent-bubble')) return;
+    const textEl = bubble.querySelector('.msg-text');
+    if (textEl) textEl.textContent = newText;
+
+    const meta = bubble.querySelector('.msg-meta');
+    if (meta && !meta.querySelector('.edited-tag')) {
+        const tag = document.createElement('span');
+        tag.className = 'edited-tag';
+        tag.textContent = '(edited)';
+        meta.prepend(tag);
+    }
+}
+
+function applyUnsendToMessage(msgId) {
+    const wrapper = document.getElementById(`wrap-${msgId}`);
+    const bubble = document.getElementById(msgId);
+    if (!bubble) return;
+
+    bubble.className = 'msg-bubble unsent-bubble';
+    bubble.innerHTML = '🚫 This message was unsent';
+
+    // Remove edit/unsend/reply side buttons
+    if (wrapper) {
+        const actions = wrapper.querySelector('.msg-actions');
+        if (actions) actions.remove();
+    }
+}
+
+function cancelAction() {
     activeReplyText = null;
-    document.getElementById('replyBar').classList.add('hidden');
+    editingMsgId = null;
+    document.getElementById('actionBar').classList.add('hidden');
 }
 
 function toggleHeartOnMsg(msgId) {
     const bubble = document.getElementById(msgId);
-    if (!bubble) return;
+    if (!bubble || bubble.classList.contains('unsent-bubble')) return;
     let badge = bubble.querySelector('.heart-badge');
     if (badge) badge.remove();
     else {
@@ -253,6 +329,7 @@ function appendMessage(text, side, time, msgId, replyTo) {
     const container = document.getElementById('messagesContainer');
     const wrapper = document.createElement('div');
     wrapper.className = `msg-wrapper ${side}`;
+    wrapper.id = `wrap-${msgId}`;
 
     const bubble = document.createElement('div');
     bubble.className = `msg-bubble msg-${side}`;
@@ -266,6 +343,7 @@ function appendMessage(text, side, time, msgId, replyTo) {
     }
 
     const textDiv = document.createElement('div');
+    textDiv.className = 'msg-text';
     textDiv.textContent = text;
 
     const meta = document.createElement('div');
@@ -275,9 +353,10 @@ function appendMessage(text, side, time, msgId, replyTo) {
     bubble.appendChild(textDiv);
     bubble.appendChild(meta);
 
-    // Double-tap / Double-click to Heart React
+    // Double-tap to Heart React
     let lastTap = 0;
     bubble.addEventListener('click', () => {
+        if (bubble.classList.contains('unsent-bubble')) return;
         const now = Date.now();
         if (now - lastTap < 300) {
             toggleHeartOnMsg(msgId);
@@ -286,13 +365,36 @@ function appendMessage(text, side, time, msgId, replyTo) {
         lastTap = now;
     });
 
+    // Side Action Buttons (Reply, Edit, Unsend)
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'msg-actions';
+
     const replyBtn = document.createElement('button');
-    replyBtn.className = 'reply-trigger';
+    replyBtn.className = 'mini-action-btn';
+    replyBtn.title = 'Reply';
     replyBtn.textContent = '↩';
-    replyBtn.onclick = () => setReply(text);
+    replyBtn.onclick = () => startReply(textDiv.textContent);
+    actionsDiv.appendChild(replyBtn);
+
+    if (side === 'sent') {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'mini-action-btn';
+        editBtn.title = 'Edit Message';
+        editBtn.textContent = '✏️';
+        editBtn.onclick = () => startEdit(msgId);
+
+        const unsendBtn = document.createElement('button');
+        unsendBtn.className = 'mini-action-btn';
+        unsendBtn.title = 'Unsend Message';
+        unsendBtn.textContent = '🗑️';
+        unsendBtn.onclick = () => unsendMessage(msgId);
+
+        actionsDiv.appendChild(editBtn);
+        actionsDiv.appendChild(unsendBtn);
+    }
 
     wrapper.appendChild(bubble);
-    wrapper.appendChild(replyBtn);
+    wrapper.appendChild(actionsDiv);
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
 }
@@ -301,9 +403,10 @@ function appendMessage(text, side, time, msgId, replyTo) {
 async function sendBinaryFile(fileOrBlob, fileName, mimeType) {
     if (!conn || !conn.open) return;
     const time = getCurrentTime();
+    const msgId = `msg-${Date.now()}-${++msgCounter}`;
     const arrayBuffer = await fileOrBlob.arrayBuffer();
 
-    conn.send({ type: 'file-meta', name: fileName, size: arrayBuffer.byteLength, mime: mimeType, time });
+    conn.send({ type: 'file-meta', name: fileName, size: arrayBuffer.byteLength, mime: mimeType, time, msgId });
 
     let offset = 0;
     while (offset < arrayBuffer.byteLength) {
@@ -318,7 +421,7 @@ async function sendBinaryFile(fileOrBlob, fileName, mimeType) {
 
     updateProgress(false);
     const localBlobUrl = URL.createObjectURL(fileOrBlob);
-    appendUniversalFile(localBlobUrl, fileName, mimeType, arrayBuffer.byteLength, 'sent', time);
+    appendUniversalFile(localBlobUrl, fileName, mimeType, arrayBuffer.byteLength, 'sent', time, msgId);
 }
 
 document.getElementById('fileInput').addEventListener('change', async (e) => {
@@ -328,13 +431,15 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     e.target.value = '';
 });
 
-function appendUniversalFile(blobUrl, fileName, mimeType, byteSize, side, time) {
+function appendUniversalFile(blobUrl, fileName, mimeType, byteSize, side, time, msgId) {
     const container = document.getElementById('messagesContainer');
     const wrapper = document.createElement('div');
     wrapper.className = `msg-wrapper ${side}`;
+    wrapper.id = `wrap-${msgId}`;
 
     const bubble = document.createElement('div');
     bubble.className = `msg-bubble msg-${side}`;
+    bubble.id = msgId;
 
     if (mimeType.startsWith('audio/')) {
         const audio = document.createElement('audio');
@@ -391,6 +496,22 @@ function appendUniversalFile(blobUrl, fileName, mimeType, byteSize, side, time) 
     bubble.appendChild(meta);
 
     wrapper.appendChild(bubble);
+
+    // Unsend button for sent media/files too
+    if (side === 'sent') {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'msg-actions';
+
+        const unsendBtn = document.createElement('button');
+        unsendBtn.className = 'mini-action-btn';
+        unsendBtn.title = 'Unsend Media';
+        unsendBtn.textContent = '🗑️';
+        unsendBtn.onclick = () => unsendMessage(msgId);
+
+        actionsDiv.appendChild(unsendBtn);
+        wrapper.appendChild(actionsDiv);
+    }
+
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
 }

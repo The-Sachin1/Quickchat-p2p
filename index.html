@@ -13,7 +13,7 @@
         <div class="auth-card">
             <div class="logo-badge">🔒 END-TO-END ENCRYPTED • FULL-HD P2P</div>
             <h1>QuickChat HD</h1>
-            <p class="subtitle">Themes • Voice Notes • Reactions • Lossless HD Media</p>
+            <p class="subtitle">Themes • Voice Notes • Edit & Unsend • Lossless HD Media</p>
 
             <input type="text" id="usernameInput" placeholder="Apna naam likho..." value="sachiin" maxlength="16">
 
@@ -78,13 +78,13 @@
             <p class="modal-hint">Tap anywhere to close</p>
         </div>
 
-        <!-- Reply Quote Preview Bar -->
-        <div id="replyBar" class="reply-bar hidden">
+        <!-- Reply / Edit Preview Bar -->
+        <div id="actionBar" class="reply-bar hidden">
             <div class="reply-content">
-                <span class="reply-label">Replying to:</span>
-                <p id="replyPreviewText">Message text...</p>
+                <span id="actionLabel" class="reply-label">Replying to:</span>
+                <p id="actionPreviewText">Message text...</p>
             </div>
-            <button onclick="cancelReply()" class="close-reply">✕</button>
+            <button onclick="cancelAction()" class="close-reply">✕</button>
         </div>
 
         <!-- Quick Emojis -->

@@ -254,7 +254,6 @@ body, html {
 }
 .e2e-notice strong { color: #facc15; }
 
-/* Fun Icebreaker Card */
 .game-card {
     align-self: center;
     max-width: 88%;
@@ -276,12 +275,12 @@ body, html {
     margin-bottom: 4px;
 }
 
-/* Message Bubbles */
+/* Message Bubbles & Action Controls */
 .msg-wrapper {
     display: flex;
     align-items: center;
-    gap: 6px;
-    max-width: 84%;
+    gap: 5px;
+    max-width: 86%;
     position: relative;
 }
 .msg-wrapper.sent { align-self: flex-end; flex-direction: row-reverse; }
@@ -310,6 +309,15 @@ body, html {
     border-bottom-left-radius: 3px;
 }
 
+.unsent-bubble {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    color: #94a3b8 !important;
+    font-style: italic;
+    font-size: 13.5px;
+    cursor: default;
+}
+
 .quote-box {
     background: rgba(0, 0, 0, 0.28);
     border-left: 3px solid var(--accent);
@@ -320,16 +328,28 @@ body, html {
     margin-bottom: 6px;
 }
 
-.reply-trigger {
+.msg-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mini-action-btn {
     background: rgba(255, 255, 255, 0.08);
     border: none;
-    color: #94a3b8;
-    width: 26px;
-    height: 26px;
+    color: #cbd5e1;
+    width: 25px;
+    height: 25px;
     border-radius: 50%;
-    font-size: 13px;
+    font-size: 12px;
     cursor: pointer;
-    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mini-action-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .heart-badge {
@@ -342,7 +362,6 @@ body, html {
     padding: 1px 6px;
     font-size: 12px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    animation: popIn 0.2s ease;
 }
 
 .hd-badge {
@@ -367,11 +386,7 @@ body, html {
     margin-bottom: 6px;
 }
 
-audio {
-    width: 210px;
-    height: 36px;
-    margin-bottom: 4px;
-}
+audio { width: 210px; height: 36px; margin-bottom: 4px; }
 
 .download-hd-btn {
     display: block;
@@ -398,7 +413,12 @@ audio {
     margin-top: 2px;
 }
 
-/* Reply Quote Bar */
+.edited-tag {
+    font-style: italic;
+    opacity: 0.85;
+}
+
+/* Reply / Edit Bar */
 .reply-bar {
     width: 100%;
     background: #182229;
@@ -410,7 +430,7 @@ audio {
 }
 .reply-content { border-left: 3px solid var(--accent); padding-left: 8px; overflow: hidden; }
 .reply-label { font-size: 11px; color: var(--accent); font-weight: 700; }
-#replyPreviewText { font-size: 13px; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#actionPreviewText { font-size: 13px; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .close-reply { background: none; border: none; color: #94a3b8; font-size: 16px; cursor: pointer; padding: 4px; }
 
 /* Fullscreen Modal */
