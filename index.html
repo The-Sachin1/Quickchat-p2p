@@ -68,7 +68,7 @@
         <!-- Messages Area -->
         <main id="messagesContainer" class="messages-area">
             <div class="e2e-notice">
-                🔒 Messages, voice notes, and media are <strong>end-to-end encrypted</strong>. No one outside of this chat, not even the developers, can read or listen to them. Double-tap any message to ❤️ react!
+                🔒 Messages, voice notes, and media are <strong>end-to-end encrypted</strong>. No one outside of this chat, not even the developers, can read or listen to them. Tap any message to Reply, Edit, Unsend, or ❤️ React!
             </div>
         </main>
 
@@ -84,17 +84,17 @@
                 <span id="actionLabel" class="reply-label">Replying to:</span>
                 <p id="actionPreviewText">Message text...</p>
             </div>
-            <button onclick="cancelAction()" class="close-reply">✕</button>
+            <button type="button" onclick="cancelAction()" class="close-reply">✕</button>
         </div>
 
         <!-- Quick Emojis -->
         <div class="emoji-bar">
-            <button onclick="sendEmoji('😂')">😂</button>
-            <button onclick="sendEmoji('❤️')">❤️</button>
-            <button onclick="sendEmoji('🔥')">🔥</button>
-            <button onclick="sendEmoji('🥺')">🥺</button>
-            <button onclick="sendEmoji('😎')">😎</button>
-            <button onclick="sendEmoji('✨')">✨</button>
+            <button type="button" onclick="sendEmoji('😂')">😂</button>
+            <button type="button" onclick="sendEmoji('❤️')">❤️</button>
+            <button type="button" onclick="sendEmoji('🔥')">🔥</button>
+            <button type="button" onclick="sendEmoji('🥺')">🥺</button>
+            <button type="button" onclick="sendEmoji('😎')">😎</button>
+            <button type="button" onclick="sendEmoji('✨')">✨</button>
         </div>
 
         <!-- Message Input Bar -->
@@ -102,8 +102,8 @@
             <label for="fileInput" class="attach-btn" title="Send Photo, Video, or Document">📎</label>
             <input type="file" id="fileInput" class="hidden">
             <input type="text" id="msgInput" placeholder="Message likho..." autocomplete="off">
-            <button id="micBtn" class="mic-btn" title="Record Voice Note">🎤</button>
-            <button id="sendBtn" class="send-btn hidden">➤</button>
+            <button type="button" id="micBtn" class="mic-btn" title="Record Voice Note">🎤</button>
+            <button type="button" id="sendBtn" class="send-btn hidden">➤</button>
         </footer>
     </div>
 

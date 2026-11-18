@@ -212,7 +212,6 @@ function sendMessage() {
     const text = input.value.trim();
     if (!text || !conn || !conn.open) return;
 
-    // If currently editing an existing message
     if (editingMsgId) {
         applyEditToMessage(editingMsgId, text);
         conn.send({ type: 'edit', msgId: editingMsgId, newText: text });
@@ -241,7 +240,81 @@ function sendEmoji(emoji) {
     appendMessage(emoji, 'sent', time, msgId, null);
 }
 
-// Reply, Edit & Unsend Handlers
+// Close all open popup menus
+function closeAllMenus() {
+    document.querySelectorAll('.msg-popup-menu').forEach(m => m.remove());
+}
+
+// Toggle Touch Menu on Message Tap
+function toggleMessageMenu(wrapper, msgId, side, isTextMsg) {
+    const existing = wrapper.querySelector('.msg-popup-menu');
+    closeAllMenus();
+    if (existing) return;
+
+    const bubble = document.getElementById(msgId);
+    if (!bubble || bubble.classList.contains('unsent-bubble')) return;
+
+    const menu = document.createElement('div');
+    menu.className = 'msg-popup-menu';
+
+    // Heart React Button
+    const reactBtn = document.createElement('button');
+    reactBtn.type = 'button';
+    reactBtn.className = 'popup-btn';
+    reactBtn.textContent = '❤️';
+    reactBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleHeartOnMsg(msgId);
+        if (conn && conn.open) conn.send({ type: 'react', msgId });
+        closeAllMenus();
+    };
+    menu.appendChild(reactBtn);
+
+    // Reply Button
+    if (isTextMsg) {
+        const replyBtn = document.createElement('button');
+        replyBtn.type = 'button';
+        replyBtn.className = 'popup-btn';
+        replyBtn.textContent = '↩ Reply';
+        replyBtn.onclick = (e) => {
+            e.stopPropagation();
+            const txt = bubble.querySelector('.msg-text')?.textContent || 'Media';
+            startReply(txt);
+            closeAllMenus();
+        };
+        menu.appendChild(replyBtn);
+    }
+
+    // Edit & Unsend Buttons (Only for Sent Messages)
+    if (side === 'sent') {
+        if (isTextMsg) {
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.className = 'popup-btn';
+            editBtn.textContent = '✏️ Edit';
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                startEdit(msgId);
+                closeAllMenus();
+            };
+            menu.appendChild(editBtn);
+        }
+
+        const unsendBtn = document.createElement('button');
+        unsendBtn.type = 'button';
+        unsendBtn.className = 'popup-btn danger';
+        unsendBtn.textContent = '🗑️ Unsend';
+        unsendBtn.onclick = (e) => {
+            e.stopPropagation();
+            unsendMessage(msgId);
+            closeAllMenus();
+        };
+        menu.appendChild(unsendBtn);
+    }
+
+    wrapper.appendChild(menu);
+}
+
 function startReply(text) {
     cancelAction();
     activeReplyText = text;
@@ -292,18 +365,11 @@ function applyEditToMessage(msgId, newText) {
 }
 
 function applyUnsendToMessage(msgId) {
-    const wrapper = document.getElementById(`wrap-${msgId}`);
     const bubble = document.getElementById(msgId);
     if (!bubble) return;
-
     bubble.className = 'msg-bubble unsent-bubble';
     bubble.innerHTML = '🚫 This message was unsent';
-
-    // Remove edit/unsend/reply side buttons
-    if (wrapper) {
-        const actions = wrapper.querySelector('.msg-actions');
-        if (actions) actions.remove();
-    }
+    closeAllMenus();
 }
 
 function cancelAction() {
@@ -353,48 +419,13 @@ function appendMessage(text, side, time, msgId, replyTo) {
     bubble.appendChild(textDiv);
     bubble.appendChild(meta);
 
-    // Double-tap to Heart React
-    let lastTap = 0;
-    bubble.addEventListener('click', () => {
-        if (bubble.classList.contains('unsent-bubble')) return;
-        const now = Date.now();
-        if (now - lastTap < 300) {
-            toggleHeartOnMsg(msgId);
-            if (conn && conn.open) conn.send({ type: 'react', msgId });
-        }
-        lastTap = now;
+    // Single Tap on Message Bubble opens Reply / Edit / Unsend / React Menu
+    bubble.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleMessageMenu(wrapper, msgId, side, true);
     });
 
-    // Side Action Buttons (Reply, Edit, Unsend)
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'msg-actions';
-
-    const replyBtn = document.createElement('button');
-    replyBtn.className = 'mini-action-btn';
-    replyBtn.title = 'Reply';
-    replyBtn.textContent = '↩';
-    replyBtn.onclick = () => startReply(textDiv.textContent);
-    actionsDiv.appendChild(replyBtn);
-
-    if (side === 'sent') {
-        const editBtn = document.createElement('button');
-        editBtn.className = 'mini-action-btn';
-        editBtn.title = 'Edit Message';
-        editBtn.textContent = '✏️';
-        editBtn.onclick = () => startEdit(msgId);
-
-        const unsendBtn = document.createElement('button');
-        unsendBtn.className = 'mini-action-btn';
-        unsendBtn.title = 'Unsend Message';
-        unsendBtn.textContent = '🗑️';
-        unsendBtn.onclick = () => unsendMessage(msgId);
-
-        actionsDiv.appendChild(editBtn);
-        actionsDiv.appendChild(unsendBtn);
-    }
-
     wrapper.appendChild(bubble);
-    wrapper.appendChild(actionsDiv);
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
 }
@@ -455,7 +486,7 @@ function appendUniversalFile(blobUrl, fileName, mimeType, byteSize, side, time, 
         const img = document.createElement('img');
         img.src = blobUrl;
         img.className = 'msg-img';
-        img.onclick = () => openModal(blobUrl);
+        img.onclick = (e) => { e.stopPropagation(); openModal(blobUrl); };
         bubble.appendChild(img);
     } else if (mimeType.startsWith('video/')) {
         const badge = document.createElement('div');
@@ -487,6 +518,7 @@ function appendUniversalFile(blobUrl, fileName, mimeType, byteSize, side, time, 
         dlBtn.download = fileName || 'QuickChat_File';
         dlBtn.className = 'download-hd-btn';
         dlBtn.textContent = `⬇ Download Original (${formatFileSize(byteSize)})`;
+        dlBtn.onclick = (e) => e.stopPropagation();
         bubble.appendChild(dlBtn);
     }
 
@@ -495,26 +527,19 @@ function appendUniversalFile(blobUrl, fileName, mimeType, byteSize, side, time, 
     meta.innerHTML = `<span>${time}</span> ${side === 'sent' ? '<span>✓✓</span>' : ''}`;
     bubble.appendChild(meta);
 
+    // Tap media bubble to show React / Unsend menu
+    bubble.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleMessageMenu(wrapper, msgId, side, false);
+    });
+
     wrapper.appendChild(bubble);
-
-    // Unsend button for sent media/files too
-    if (side === 'sent') {
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'msg-actions';
-
-        const unsendBtn = document.createElement('button');
-        unsendBtn.className = 'mini-action-btn';
-        unsendBtn.title = 'Unsend Media';
-        unsendBtn.textContent = '🗑️';
-        unsendBtn.onclick = () => unsendMessage(msgId);
-
-        actionsDiv.appendChild(unsendBtn);
-        wrapper.appendChild(actionsDiv);
-    }
-
     container.appendChild(wrapper);
     container.scrollTop = container.scrollHeight;
 }
+
+// Close popup menu when tapping anywhere else in chat
+document.getElementById('messagesContainer').addEventListener('click', closeAllMenus);
 
 function updateProgress(show, text = '', pct = 0) {
     const bar = document.getElementById('transferBar');
