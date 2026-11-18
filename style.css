@@ -274,11 +274,11 @@ body, html {
     margin-bottom: 4px;
 }
 
-/* Message Wrapper & Tap Menu */
+/* Message Wrapper & Touch Menu */
 .msg-wrapper {
     display: flex;
     flex-direction: column;
-    max-width: 84%;
+    max-width: 85%;
     position: relative;
 }
 .msg-wrapper.sent { align-self: flex-end; align-items: flex-end; }
@@ -292,6 +292,7 @@ body, html {
     word-wrap: break-word;
     position: relative;
     cursor: pointer;
+    touch-action: manipulation;
     animation: popIn 0.15s ease;
 }
 
@@ -326,33 +327,35 @@ body, html {
     margin-bottom: 6px;
 }
 
-/* Tap-to-Open Touch Action Pill Menu */
+/* Mobile-Friendly Touch Action Menu */
 .msg-popup-menu {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     background: #1e293b;
-    border: 1px solid #334155;
-    padding: 5px 8px;
-    border-radius: 20px;
-    margin-top: 5px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
-    z-index: 10;
-    animation: popIn 0.15s ease;
+    border: 1px solid #475569;
+    padding: 6px 10px;
+    border-radius: 22px;
+    margin-top: 6px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65);
+    z-index: 20;
+    animation: popIn 0.12s ease;
 }
 
 .popup-btn {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.12);
     border: none;
     color: #f8fafc;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    padding: 5px 10px;
-    border-radius: 14px;
+    padding: 7px 12px;
+    border-radius: 16px;
     cursor: pointer;
+    touch-action: manipulation;
 }
 
 .popup-btn.danger {
-    background: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.25);
     color: #fca5a5;
 }
 

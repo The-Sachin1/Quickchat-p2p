@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>QuickChat HD — Interactive P2P Messenger</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body class="theme-default">
@@ -18,8 +18,8 @@
             <input type="text" id="usernameInput" placeholder="Apna naam likho..." value="sachiin" maxlength="16">
 
             <div class="tabs">
-                <button id="createTabBtn" class="tab active" onclick="switchTab('create')">Create Room</button>
-                <button id="joinTabBtn" class="tab" onclick="switchTab('join')">Join Room</button>
+                <button type="button" id="createTabBtn" class="tab active" onclick="switchTab('create')">Create Room</button>
+                <button type="button" id="joinTabBtn" class="tab" onclick="switchTab('join')">Join Room</button>
             </div>
 
             <!-- Create Room Panel -->
@@ -27,7 +27,7 @@
                 <p class="hint">Dost ko yeh 4-digit Room Code bhejo:</p>
                 <div class="code-box">
                     <span id="myRoomCode">----</span>
-                    <button id="copyCodeBtn" title="Copy Code">📋</button>
+                    <button type="button" id="copyCodeBtn" title="Copy Code">📋</button>
                 </div>
                 <div id="hostStatus" class="status-pill">⏳ Generating Room ID...</div>
             </div>
@@ -36,7 +36,7 @@
             <div id="joinPanel" class="panel hidden">
                 <p class="hint">Dost ka 4-digit Room Code daalo:</p>
                 <input type="tel" id="joinCodeInput" placeholder="e.g. 4829" maxlength="4">
-                <button id="connectBtn" class="primary-btn">CONNECT NOW</button>
+                <button type="button" id="connectBtn" class="primary-btn">CONNECT NOW</button>
                 <div id="joinStatus" class="status-text"></div>
             </div>
         </div>
@@ -53,9 +53,9 @@
                 </div>
             </div>
             <div class="header-actions">
-                <button id="gameBtn" class="icon-btn" title="Fun Truth/Dare Icebreaker">🎲</button>
-                <button id="themeBtn" class="icon-btn" title="Change Chat Theme">🎨</button>
-                <button id="leaveBtn" class="leave-btn">Exit</button>
+                <button type="button" id="gameBtn" class="icon-btn" title="Fun Truth/Dare Icebreaker">🎲</button>
+                <button type="button" id="themeBtn" class="icon-btn" title="Change Chat Theme">🎨</button>
+                <button type="button" id="leaveBtn" class="leave-btn">Exit</button>
             </div>
         </header>
 
@@ -107,6 +107,6 @@
         </footer>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>
