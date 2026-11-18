@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QuickChat HD — Lossless P2P Messenger</title>
+    <title>QuickChat HD — Interactive P2P Messenger</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
-<body>
+<body class="theme-default">
     <!-- Lobby / Connect Screen -->
     <div id="connectScreen" class="screen">
         <div class="auth-card">
-            <div class="logo-badge">💎 LOSSLESS FULL-HD P2P</div>
+            <div class="logo-badge">🔒 END-TO-END ENCRYPTED • FULL-HD P2P</div>
             <h1>QuickChat HD</h1>
-            <p class="subtitle">Zero Compression • HD Photos, Videos & Docs • Private Chat</p>
+            <p class="subtitle">Themes • Voice Notes • Reactions • Lossless HD Media</p>
 
             <input type="text" id="usernameInput" placeholder="Apna naam likho..." value="sachiin" maxlength="16">
 
@@ -49,10 +49,14 @@
                 <div class="avatar" id="peerAvatar">F</div>
                 <div>
                     <h3 id="peerName">Friend</h3>
-                    <span id="peerStatus" class="online-text">● Online (HD Ready)</span>
+                    <span id="peerStatus" class="online-text">● Online • E2E Encrypted</span>
                 </div>
             </div>
-            <button id="leaveBtn" class="leave-btn">Exit</button>
+            <div class="header-actions">
+                <button id="gameBtn" class="icon-btn" title="Fun Truth/Dare Icebreaker">🎲</button>
+                <button id="themeBtn" class="icon-btn" title="Change Chat Theme">🎨</button>
+                <button id="leaveBtn" class="leave-btn">Exit</button>
+            </div>
         </header>
 
         <!-- Transfer Progress Bar -->
@@ -63,7 +67,9 @@
 
         <!-- Messages Area -->
         <main id="messagesContainer" class="messages-area">
-            <div class="system-msg">💎 Direct P2P Connected! Photos, Videos & Documents are sent in 100% Original Quality without compression.</div>
+            <div class="e2e-notice">
+                🔒 Messages, voice notes, and media are <strong>end-to-end encrypted</strong>. No one outside of this chat, not even the developers, can read or listen to them. Double-tap any message to ❤️ react!
+            </div>
         </main>
 
         <!-- Fullscreen HD Image Preview Modal -->
@@ -72,14 +78,23 @@
             <p class="modal-hint">Tap anywhere to close</p>
         </div>
 
+        <!-- Reply Quote Preview Bar -->
+        <div id="replyBar" class="reply-bar hidden">
+            <div class="reply-content">
+                <span class="reply-label">Replying to:</span>
+                <p id="replyPreviewText">Message text...</p>
+            </div>
+            <button onclick="cancelReply()" class="close-reply">✕</button>
+        </div>
+
         <!-- Quick Emojis -->
         <div class="emoji-bar">
             <button onclick="sendEmoji('😂')">😂</button>
             <button onclick="sendEmoji('❤️')">❤️</button>
             <button onclick="sendEmoji('🔥')">🔥</button>
-            <button onclick="sendEmoji('👍')">👍</button>
+            <button onclick="sendEmoji('🥺')">🥺</button>
             <button onclick="sendEmoji('😎')">😎</button>
-            <button onclick="sendEmoji('📸')">📸</button>
+            <button onclick="sendEmoji('✨')">✨</button>
         </div>
 
         <!-- Message Input Bar -->
@@ -87,7 +102,8 @@
             <label for="fileInput" class="attach-btn" title="Send Photo, Video, or Document">📎</label>
             <input type="file" id="fileInput" class="hidden">
             <input type="text" id="msgInput" placeholder="Message likho..." autocomplete="off">
-            <button id="sendBtn" class="send-btn">➤</button>
+            <button id="micBtn" class="mic-btn" title="Record Voice Note">🎤</button>
+            <button id="sendBtn" class="send-btn hidden">➤</button>
         </footer>
     </div>
 
