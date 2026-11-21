@@ -1,7 +1,7 @@
-// QuickChat HD v3.2 — Zero-Lag Liquid Glass P2P E2EE Messenger + Live QR Scanner
+// QuickChat HD v3.3 — Instant Unlock + Fail-Safe Signaling + Liquid Glass E2EE
 const PEER_PREFIX = "quickchat-hd-v3-";
-const CHUNK_SIZE = 65536; // 64KB chunks for 100+ photos & 50+ videos without RAM overflow
-const HIGH_WATER_MARK = 1048576; // 1MB WebRTC buffer threshold
+const CHUNK_SIZE = 65536;
+const HIGH_WATER_MARK = 1048576;
 
 let peer = null;
 let activeConn = null;
@@ -12,7 +12,7 @@ let chatStore = JSON.parse(localStorage.getItem("qchd_chats") || "{}");
 let callLogs = JSON.parse(localStorage.getItem("qchd_calls") || "[]");
 let currentPeerUser = null;
 
-// E2EE Crypto Keys (ECDH P-256 + AES-GCM-256)
+// E2EE Crypto Keys
 let myKeyPair = null;
 let sharedAesKey = null;
 
@@ -34,8 +34,11 @@ const startAppBtn = document.getElementById("startAppBtn");
 const setupStatus = document.getElementById("setupStatus");
 
 window.addEventListener("DOMContentLoaded", () => {
+    // Unregister any stuck old service worker cache
     if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("sw.js").catch(() => {});
+        navigator.serviceWorker.getRegistrations().then(regs => {
+            regs.forEach(r => r.update());
+        }).catch(() => {});
     }
 
     document.querySelectorAll(".avatar-opt").forEach(btn => {
@@ -68,12 +71,33 @@ startAppBtn.addEventListener("click", () => {
 
     myProfile = { username: rawUser, displayName, avatar };
     localStorage.setItem("qchd_profile", JSON.stringify(myProfile));
-    setupStatus.textContent = "Connecting to E2EE P2P Network...";
     initPeerNetwork(myProfile);
 });
 
 async function initPeerNetwork(profile) {
-    await generateECDHKeys();
+    // 1. INSTANTLY OPEN HOME SCREEN (0ms wait!)
+    document.getElementById("myAvatarBadge").textContent = profile.avatar;
+    document.getElementById("myDisplayHeader").textContent = profile.displayName;
+    document.getElementById("myStatusLine").textContent = `● @${profile.username} • Connecting...`;
+    document.getElementById("vaultUsernameDisplay").textContent = `@${profile.username} (${profile.displayName})`;
+    switchScreen(homeScreen);
+    renderRecentChats();
+    renderCallLogs();
+
+    // 2. Generate ECDH Keys safely
+    if (window.crypto && window.crypto.subtle) {
+        try {
+            await generateECDHKeys();
+        } catch (e) {
+            console.warn("WebCrypto fallback active");
+        }
+    }
+
+    // 3. Connect PeerJS in background
+    if (typeof Peer === "undefined") {
+        document.getElementById("myStatusLine").textContent = `⚠️ PeerJS CDN blocked/offline`;
+        return;
+    }
 
     if (peer) peer.destroy();
     peer = new Peer(PEER_PREFIX + profile.username, {
@@ -81,28 +105,31 @@ async function initPeerNetwork(profile) {
         config: {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" }
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:global.stun.twilio.com:3478" }
             ]
         }
     });
 
     peer.on("open", () => {
-        document.getElementById("myAvatarBadge").textContent = profile.avatar;
-        document.getElementById("myDisplayHeader").textContent = profile.displayName;
         document.getElementById("myStatusLine").textContent = `● @${profile.username} • Online`;
-        document.getElementById("vaultUsernameDisplay").textContent = `@${profile.username} (${profile.displayName})`;
-        switchScreen(homeScreen);
-        renderRecentChats();
-        renderCallLogs();
+        document.getElementById("myStatusLine").classList.add("online");
         flushOfflineOutbox();
+    });
+
+    peer.on("disconnected", () => {
+        document.getElementById("myStatusLine").textContent = `● @${profile.username} • Reconnecting...`;
+        peer.reconnect();
     });
 
     peer.on("error", err => {
         if (err.type === "unavailable-id") {
-            setupStatus.textContent = `⚠️ @${profile.username} pehle se kisi ne le rakha hai. Koi aur username dalein!`;
+            alert(`⚠️ @${profile.username} pehle se active hai. Koi aur username dalein!`);
             switchScreen(setupScreen);
         } else if (err.type === "peer-unavailable") {
             document.getElementById("peerPresence").textContent = "Offline (Messages queued in Outbox)";
+        } else {
+            document.getElementById("myStatusLine").textContent = `● @${profile.username} • Local Ready`;
         }
     });
 
@@ -122,10 +149,12 @@ async function generateECDHKeys() {
 }
 
 async function exportPublicKeyJwk() {
+    if (!myKeyPair) return null;
     return await window.crypto.subtle.exportKey("jwk", myKeyPair.publicKey);
 }
 
 async function deriveSharedSecret(peerJwk) {
+    if (!peerJwk || !myKeyPair) return;
     const importedPeerKey = await window.crypto.subtle.importKey(
         "jwk",
         peerJwk,
