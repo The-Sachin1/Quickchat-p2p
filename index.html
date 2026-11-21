@@ -1,112 +1,280 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QuickChat HD — Interactive P2P Messenger</title>
-    <link rel="stylesheet" href="style.css?v=4">
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#050912" />
+    <title>QuickChat HD — Liquid Glass E2EE Messenger</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
-<body class="theme-default">
-    <!-- Lobby / Connect Screen -->
-    <div id="connectScreen" class="screen">
-        <div class="auth-card">
-            <div class="logo-badge">🔒 END-TO-END ENCRYPTED • FULL-HD P2P</div>
-            <h1>QuickChat HD</h1>
-            <p class="subtitle">Themes • Voice Notes • Edit & Unsend • Lossless HD Media</p>
-
-            <input type="text" id="usernameInput" placeholder="Apna naam likho..." value="sachiin" maxlength="16">
-
-            <div class="tabs">
-                <button type="button" id="createTabBtn" class="tab active" onclick="switchTab('create')">Create Room</button>
-                <button type="button" id="joinTabBtn" class="tab" onclick="switchTab('join')">Join Room</button>
-            </div>
-
-            <!-- Create Room Panel -->
-            <div id="createPanel" class="panel">
-                <p class="hint">Dost ko yeh 4-digit Room Code bhejo:</p>
-                <div class="code-box">
-                    <span id="myRoomCode">----</span>
-                    <button type="button" id="copyCodeBtn" title="Copy Code">📋</button>
-                </div>
-                <div id="hostStatus" class="status-pill">⏳ Generating Room ID...</div>
-            </div>
-
-            <!-- Join Room Panel -->
-            <div id="joinPanel" class="panel hidden">
-                <p class="hint">Dost ka 4-digit Room Code daalo:</p>
-                <input type="tel" id="joinCodeInput" placeholder="e.g. 4829" maxlength="4">
-                <button type="button" id="connectBtn" class="primary-btn">CONNECT NOW</button>
-                <div id="joinStatus" class="status-text"></div>
-            </div>
-        </div>
+<body>
+    <!-- Lightweight GPU-Accelerated Liquid Mesh Background -->
+    <div class="liquid-bg" aria-hidden="true">
+        <div class="liquid-blob blob-1"></div>
+        <div class="liquid-blob blob-2"></div>
     </div>
 
-    <!-- Main Chat Screen -->
-    <div id="chatScreen" class="screen hidden">
-        <header class="chat-header">
-            <div class="peer-info">
-                <div class="avatar" id="peerAvatar">F</div>
+    <div id="app" class="app-shell">
+        <!-- 1. CUSTOM USER ONBOARDING SCREEN -->
+        <section id="setupScreen" class="screen active center-screen">
+            <div class="glass-card setup-card liquid-pop">
+                <div class="brand-orb">💬</div>
+                <h1>QuickChat <span class="accent">HD</span></h1>
+                <p class="subtitle">Liquid Glass • ECDH AES-256 E2EE • P2P</p>
+
+                <div class="input-group">
+                    <label for="usernameInput">Apna Unique Username Banayein</label>
+                    <div class="prefix-input">
+                        <span>@</span>
+                        <input type="text" id="usernameInput" placeholder="apna_username_likhein" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="displayNameInput">Apna Naam (Display Name)</label>
+                    <input type="text" id="displayNameInput" placeholder="Enter your name" autocomplete="off" />
+                </div>
+
+                <div class="input-group">
+                    <label>Avatar Chunein</label>
+                    <div class="avatar-picker" id="avatarPicker">
+                        <button type="button" class="avatar-opt selected" data-avatar="🧑‍💻">🧑‍💻</button>
+                        <button type="button" class="avatar-opt" data-avatar="😎">😎</button>
+                        <button type="button" class="avatar-opt" data-avatar="⚡">⚡</button>
+                        <button type="button" class="avatar-opt" data-avatar="🦊">🦊</button>
+                        <button type="button" class="avatar-opt" data-avatar="🚀">🚀</button>
+                        <button type="button" class="avatar-opt" data-avatar="🎧">🎧</button>
+                    </div>
+                </div>
+
+                <button id="startAppBtn" class="btn-primary liquid-btn">Start QuickChat HD →</button>
+                <p id="setupStatus" class="status-hint"></p>
+            </div>
+        </section>
+
+        <!-- 2. WHATSAPP-STYLE HOME SCREEN -->
+        <section id="homeScreen" class="screen">
+            <header class="glass-header">
+                <div class="header-left">
+                    <div id="myAvatarBadge" class="avatar-circle">🧑‍💻</div>
+                    <div>
+                        <h2 id="myDisplayHeader" class="app-title">QuickChat HD</h2>
+                        <span id="myStatusLine" class="status-pill online">● Online</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button id="scanQrBtn" class="icon-btn" title="Scan Friend QR">📷</button>
+                    <button id="qrModalBtn" class="icon-btn" title="My QR Code">📲</button>
+                </div>
+            </header>
+
+            <!-- Direct Username Connect Bar -->
+            <div class="connect-bar glass-panel">
+                <div class="search-wrap">
+                    <span>🔍</span>
+                    <input type="text" id="connectUsernameInput" placeholder="Dost ka @username likh kar connect karein..." autocomplete="off" />
+                </div>
+                <button id="connectPeerBtn" class="btn-connect liquid-btn">Connect</button>
+            </div>
+
+            <!-- Home Tabs -->
+            <main class="home-content">
+                <div id="tabChats" class="tab-view active">
+                    <div class="section-label">
+                        <span>RECENT E2EE CHATS</span>
+                        <span class="e2ee-tag">🔒 AES-256</span>
+                    </div>
+                    <div id="recentChatsList" class="chat-list"></div>
+                </div>
+
+                <div id="tabCalls" class="tab-view">
+                    <div class="section-label">
+                        <span>HD VOICE & VIDEO CALL LOGS</span>
+                    </div>
+                    <div id="callLogsList" class="chat-list"></div>
+                </div>
+
+                <div id="tabVault" class="tab-view">
+                    <div class="glass-panel vault-card">
+                        <h3>🛡️ Security & Profile Controls</h3>
+                        <p class="muted">Active ID: <strong id="vaultUsernameDisplay">@user</strong></p>
+                        <p class="muted">Offline Outbox Queue: <strong id="queueCountDisplay">0 files pending</strong></p>
+                        <div class="vault-actions">
+                            <button id="changeUserBtn" class="btn-secondary">✏️ Edit Profile / Username</button>
+                            <button id="clearCacheBtn" class="btn-danger">🗑️ Clear Local Chats</button>
+                        </div>
+                    </div>
+                    <div class="glass-panel vault-card">
+                        <h3>📱 Android .APK & App Install</h3>
+                        <p class="muted">Chrome menu se <b>"Install App / Add to Home Screen"</b> dabayein, ya GitHub Pages URL ko <b>PWABuilder / CapacitorJS</b> se pack karke direct <code>QuickChat-HD.apk</code> install karein.</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Floating Liquid Dock -->
+            <nav class="glass-dock">
+                <button class="dock-btn active" data-tab="tabChats">
+                    <span>💬</span>
+                    <small>Chats</small>
+                </button>
+                <button class="dock-btn" data-tab="tabCalls">
+                    <span>📞</span>
+                    <small>Calls</small>
+                </button>
+                <button class="dock-btn" data-tab="tabVault">
+                    <span>🛡️</span>
+                    <small>Security</small>
+                </button>
+            </nav>
+        </section>
+
+        <!-- 3. WHATSAPP-STYLE E2EE CHAT SCREEN -->
+        <section id="chatScreen" class="screen">
+            <header class="glass-header chat-header">
+                <div class="header-left">
+                    <button id="backHomeBtn" class="icon-btn">←</button>
+                    <div id="peerAvatar" class="avatar-circle">👤</div>
+                    <div class="peer-meta">
+                        <h3 id="peerNameTitle">@friend</h3>
+                        <span id="peerPresence" class="status-pill">Connecting...</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button id="audioCallBtn" class="icon-btn" title="HD Audio Call">📞</button>
+                    <button id="videoCallBtn" class="icon-btn" title="HD Video Call">📹</button>
+                    <button id="moreToolsBtn" class="icon-btn" title="Special Features">✨</button>
+                </div>
+            </header>
+
+            <div id="e2eeBanner" class="e2ee-strip">
+                🔒 End-to-End Encrypted (ECDH P-256 + AES-GCM) • Safety Code: <strong id="safetyCodeText">----</strong>
+            </div>
+
+            <div id="batchProgressBar" class="batch-banner hidden">
+                <div class="batch-top">
+                    <span id="batchStatusText">Streaming batch: 1 / 150</span>
+                    <span id="batchPercentText">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div id="batchProgressFill" class="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- Messages Scroll Feed -->
+            <div id="messagesContainer" class="messages-feed"></div>
+
+            <!-- Special Feature Drawer -->
+            <div id="specialDrawer" class="glass-panel special-drawer hidden">
+                <button type="button" class="tool-chip" id="toggleViewOnceBtn">1️⃣ View-Once: OFF</button>
+                <button type="button" class="tool-chip" id="toggleBurnBtn">🔥 Burn 10s: OFF</button>
+                <button type="button" class="tool-chip" id="openStegoBtn">🕵️ Secret Photo (Stego)</button>
+                <button type="button" class="tool-chip" id="openWatchPartyBtn">🎬 Watch Party</button>
+                <button type="button" class="tool-chip" id="startGameBtn">🎮 Tic-Tac-Toe</button>
+            </div>
+
+            <!-- Reply Preview Bar -->
+            <div id="replyBar" class="reply-bar hidden">
                 <div>
-                    <h3 id="peerName">Friend</h3>
-                    <span id="peerStatus" class="online-text">● Online • E2E Encrypted</span>
+                    <small class="accent">Replying to</small>
+                    <p id="replyPreviewText" class="truncate"></p>
+                </div>
+                <button id="cancelReplyBtn" class="icon-btn">✕</button>
+            </div>
+
+            <!-- Chat Input Composer -->
+            <footer class="glass-composer">
+                <input type="file" id="multiMediaInput" multiple accept="image/*,video/*,*/*" hidden />
+                <button id="attachBatchBtn" class="icon-btn" title="Send up to 100+ Photos & 50+ Videos">📎</button>
+                <input type="text" id="messageInput" placeholder="Write an encrypted message..." autocomplete="off" />
+                <button id="voiceNoteBtn" class="icon-btn" title="Tap for Voice Note">🎙️</button>
+                <button id="sendMsgBtn" class="send-btn liquid-btn">➤</button>
+            </footer>
+        </section>
+
+        <!-- 4. HD VIDEO / AUDIO CALL & SCREEN SHARE OVERLAY -->
+        <div id="callOverlay" class="call-overlay hidden">
+            <div class="call-stage">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <video id="localVideo" autoplay muted playsinline></video>
+
+                <div class="call-top-info glass-panel">
+                    <span class="e2ee-tag">🔒 E2EE P2P Call</span>
+                    <h2 id="callPeerName">@friend</h2>
+                    <p id="callTimerText">Ringing...</p>
+                </div>
+
+                <div id="incomingCallControls" class="call-controls hidden">
+                    <button id="acceptCallBtn" class="call-action accept">📞 Accept</button>
+                    <button id="rejectCallBtn" class="call-action reject">✕ Decline</button>
+                </div>
+
+                <div id="activeCallControls" class="call-controls glass-panel">
+                    <button id="toggleMicBtn" class="ctrl-btn">🎤</button>
+                    <button id="toggleCamBtn" class="ctrl-btn">📷</button>
+                    <button id="shareScreenBtn" class="ctrl-btn" title="Share Screen">🖥️</button>
+                    <button id="endCallBtn" class="call-action reject">End</button>
                 </div>
             </div>
-            <div class="header-actions">
-                <button type="button" id="gameBtn" class="icon-btn" title="Fun Truth/Dare Icebreaker">🎲</button>
-                <button type="button" id="themeBtn" class="icon-btn" title="Change Chat Theme">🎨</button>
-                <button type="button" id="leaveBtn" class="leave-btn">Exit</button>
+        </div>
+
+        <!-- 5. MY QR CODE MODAL -->
+        <div id="qrModal" class="modal-backdrop hidden">
+            <div class="glass-card modal-box liquid-pop">
+                <h3>📲 My Connect QR</h3>
+                <p class="muted">Dost ko yeh QR scan karwayein ya <strong>@<span id="qrUserLabel">user</span></strong> search karein</p>
+                <div id="qrcodeContainer" class="qr-box"></div>
+                <button id="closeQrBtn" class="btn-primary">Close</button>
             </div>
-        </header>
-
-        <!-- Transfer Progress Bar -->
-        <div id="transferBar" class="transfer-bar hidden">
-            <span id="transferText">Sending File... 0%</span>
-            <div class="progress-bg"><div id="progressFill" class="progress-fill"></div></div>
         </div>
 
-        <!-- Messages Area -->
-        <main id="messagesContainer" class="messages-area">
-            <div class="e2e-notice">
-                🔒 Messages, voice notes, and media are <strong>end-to-end encrypted</strong>. No one outside of this chat, not even the developers, can read or listen to them. Tap any message to Reply, Edit, Unsend, or ❤️ React!
+        <!-- 6. LIVE QR CAMERA SCANNER MODAL -->
+        <div id="qrScannerModal" class="modal-backdrop hidden">
+            <div class="glass-card modal-box liquid-pop">
+                <h3>📷 Scan Friend's QR</h3>
+                <p class="muted">Dost ke QuickChat QR par camera rakhein</p>
+                <div id="qrReaderBox" style="width:100%;margin:12px 0;border-radius:14px;overflow:hidden;"></div>
+                <button id="closeScannerBtn" class="btn-secondary" style="width:100%;">Cancel</button>
             </div>
-        </main>
-
-        <!-- Fullscreen HD Image Preview Modal -->
-        <div id="imageModal" class="modal hidden" onclick="closeModal()">
-            <img id="modalImg" src="" alt="Full HD Preview">
-            <p class="modal-hint">Tap anywhere to close</p>
         </div>
 
-        <!-- Reply / Edit Preview Bar -->
-        <div id="actionBar" class="reply-bar hidden">
-            <div class="reply-content">
-                <span id="actionLabel" class="reply-label">Replying to:</span>
-                <p id="actionPreviewText">Message text...</p>
+        <!-- 7. INVISIBLE STEGANOGRAPHY MODAL -->
+        <div id="stegoModal" class="modal-backdrop hidden">
+            <div class="glass-card modal-box liquid-pop">
+                <h3>🕵️ Invisible Pixel Steganography</h3>
+                <p class="muted">Normal photo ke pixels ke andar secret encrypted text chhupayein!</p>
+                <input type="file" id="stegoImageInput" accept="image/*" class="file-box" />
+                <input type="text" id="stegoSecretInput" placeholder="Secret message likhein..." />
+                <div class="modal-row">
+                    <button id="sendStegoBtn" class="btn-primary">Hide & Send</button>
+                    <button id="closeStegoBtn" class="btn-secondary">Cancel</button>
+                </div>
             </div>
-            <button type="button" onclick="cancelAction()" class="close-reply">✕</button>
         </div>
 
-        <!-- Quick Emojis -->
-        <div class="emoji-bar">
-            <button type="button" onclick="sendEmoji('😂')">😂</button>
-            <button type="button" onclick="sendEmoji('❤️')">❤️</button>
-            <button type="button" onclick="sendEmoji('🔥')">🔥</button>
-            <button type="button" onclick="sendEmoji('🥺')">🥺</button>
-            <button type="button" onclick="sendEmoji('😎')">😎</button>
-            <button type="button" onclick="sendEmoji('✨')">✨</button>
+        <!-- 8. WATCH PARTY SYNC MODAL -->
+        <div id="watchPartyModal" class="modal-backdrop hidden">
+            <div class="glass-card modal-box liquid-pop">
+                <h3>🎬 P2P Watch Party (Synced)</h3>
+                <p class="muted">Dono ke device par exact same millisecond par play/pause sync hoga!</p>
+                <input type="file" id="watchFileInput" accept="video/*,audio/*" class="file-box" />
+                <video id="watchPartyPlayer" controls class="watch-video"></video>
+                <button id="closeWatchBtn" class="btn-secondary" style="width:100%;">Close Player</button>
+            </div>
         </div>
 
-        <!-- Message Input Bar -->
-        <footer class="chat-footer">
-            <label for="fileInput" class="attach-btn" title="Send Photo, Video, or Document">📎</label>
-            <input type="file" id="fileInput" class="hidden">
-            <input type="text" id="msgInput" placeholder="Message likho..." autocomplete="off">
-            <button type="button" id="micBtn" class="mic-btn" title="Record Voice Note">🎤</button>
-            <button type="button" id="sendBtn" class="send-btn hidden">➤</button>
-        </footer>
+        <!-- 9. FULLSCREEN MEDIA LIGHTBOX -->
+        <div id="mediaLightbox" class="modal-backdrop hidden">
+            <div class="lightbox-wrap">
+                <button id="closeLightboxBtn" class="icon-btn close-lb">✕</button>
+                <div id="lightboxContent"></div>
+            </div>
+        </div>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <script src="script.js"></script>
 </body>
 </html>
