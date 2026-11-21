@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#050912" />
-    <title>QuickChat HD — iOS Liquid Glass E2EE Messenger</title>
+    <meta name="theme-color" content="#030712" />
+    <title>QuickChat HD — iOS Liquid Glass P2P</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="style.css" />
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -12,268 +12,253 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
-    <!-- iOS 26 / VisionOS GPU Liquid Mesh & Specular Refraction -->
-    <div class="liquid-bg" aria-hidden="true">
-        <div class="liquid-blob blob-1"></div>
-        <div class="liquid-blob blob-2"></div>
-        <div class="liquid-blob blob-3"></div>
-        <div id="specularSheen" class="specular-sheen"></div>
+    <!-- Dynamic iOS 26 Liquid Glass Refraction Canvas -->
+    <div class="liquid-scene" aria-hidden="true">
+        <div class="orb orb-emerald"></div>
+        <div class="orb orb-cyan"></div>
+        <div class="orb orb-indigo"></div>
+        <div id="glassSheen" class="glass-sheen"></div>
     </div>
 
-    <div id="app" class="app-shell">
-        <!-- 1. ONE-TIME PROFILE SETUP (Hidden automatically on repeat visits) -->
-        <section id="setupScreen" class="screen center-screen">
-            <div class="glass-card setup-card liquid-pop">
-                <div class="brand-orb">💬</div>
-                <h1>QuickChat <span class="accent">HD</span></h1>
-                <p class="subtitle">iOS Liquid Glass • ECDH AES-256 E2EE • P2P</p>
+    <div class="device-frame">
+        <!-- 1. FRESH ONBOARDING SCREEN (No pre-filled name) -->
+        <section id="setupScreen" class="screen active center-view">
+            <div class="ios-glass onboarding-box">
+                <div class="app-emblem">
+                    <span>💬</span>
+                </div>
+                <h1 class="hero-title">QuickChat <span>HD</span></h1>
+                <p class="hero-sub">End-to-End Encrypted • Zero Server • Liquid Glass</p>
 
-                <div class="input-group">
-                    <label for="usernameInput">Apna Permanent Username Banayein</label>
-                    <div class="prefix-input">
-                        <span>@</span>
-                        <input type="text" id="usernameInput" placeholder="apna_username_likhein" autocomplete="off" />
+                <div class="field-block">
+                    <label>Choose Unique Username</label>
+                    <div class="ios-input-wrap">
+                        <span class="at-sign">@</span>
+                        <input type="text" id="usernameInput" placeholder="e.g. rahul_99" autocomplete="off" />
                     </div>
                 </div>
 
-                <div class="input-group">
-                    <label for="displayNameInput">Apna Naam (Display Name)</label>
-                    <input type="text" id="displayNameInput" placeholder="Enter your name" autocomplete="off" />
-                </div>
-
-                <div class="input-group">
-                    <label>Avatar Chunein</label>
-                    <div class="avatar-picker" id="avatarPicker">
-                        <button type="button" class="avatar-opt selected" data-avatar="🧑‍💻">🧑‍💻</button>
-                        <button type="button" class="avatar-opt" data-avatar="😎">😎</button>
-                        <button type="button" class="avatar-opt" data-avatar="⚡">⚡</button>
-                        <button type="button" class="avatar-opt" data-avatar="🦊">🦊</button>
-                        <button type="button" class="avatar-opt" data-avatar="🚀">🚀</button>
-                        <button type="button" class="avatar-opt" data-avatar="🎧">🎧</button>
+                <div class="field-block">
+                    <label>Your Display Name</label>
+                    <div class="ios-input-wrap">
+                        <input type="text" id="displayNameInput" placeholder="Enter your full name" autocomplete="off" />
                     </div>
                 </div>
 
-                <button id="startAppBtn" class="btn-primary liquid-btn">Save & Enter QuickChat →</button>
-                <p id="setupStatus" class="status-hint"></p>
+                <div class="field-block">
+                    <label>Select Avatar</label>
+                    <div class="avatar-grid" id="avatarPicker">
+                        <button type="button" class="av-btn active" data-avatar="🧑‍💻">🧑‍💻</button>
+                        <button type="button" class="av-btn" data-avatar="😎">😎</button>
+                        <button type="button" class="av-btn" data-avatar="⚡">⚡</button>
+                        <button type="button" class="av-btn" data-avatar="🦊">🦊</button>
+                        <button type="button" class="av-btn" data-avatar="🚀">🚀</button>
+                        <button type="button" class="av-btn" data-avatar="🎧">🎧</button>
+                    </div>
+                </div>
+
+                <button id="startAppBtn" class="ios-primary-btn">Continue to QuickChat</button>
+                <p id="setupError" class="error-msg"></p>
             </div>
         </section>
 
-        <!-- 2. WHATSAPP-STYLE HOME SCREEN -->
+        <!-- 2. MODERN WHATSAPP + iOS LIQUID GLASS HOME -->
         <section id="homeScreen" class="screen">
-            <header class="glass-header">
-                <div class="header-left">
-                    <div id="myAvatarBadge" class="avatar-circle">🧑‍💻</div>
+            <header class="ios-topbar ios-glass">
+                <div class="user-chip">
+                    <div id="myAvatarBadge" class="user-av">🧑‍💻</div>
                     <div>
-                        <h2 id="myDisplayHeader" class="app-title">QuickChat HD</h2>
-                        <span id="myStatusLine" class="status-pill online">● Online</span>
+                        <h2 id="myDisplayHeader">User</h2>
+                        <div class="status-row">
+                            <span id="statusDot" class="pulse-dot"></span>
+                            <span id="myStatusLine">@username • Connecting...</span>
+                        </div>
                     </div>
                 </div>
-                <div class="header-actions">
-                    <button id="scanQrBtn" class="icon-btn" title="Scan Friend QR">📷</button>
-                    <button id="qrModalBtn" class="icon-btn" title="My QR Code">📲</button>
+                <div class="top-actions">
+                    <button id="scanQrBtn" class="glass-circle-btn" title="Scan QR">📷</button>
+                    <button id="qrModalBtn" class="glass-circle-btn" title="My QR">📲</button>
                 </div>
             </header>
 
-            <!-- Direct Username Connect Bar -->
-            <div class="connect-bar glass-panel">
-                <div class="search-wrap">
-                    <span>🔍</span>
-                    <input type="text" id="connectUsernameInput" placeholder="Dost ka @username likh kar connect karein..." autocomplete="off" />
-                </div>
-                <button id="connectPeerBtn" class="btn-connect liquid-btn">Connect</button>
+            <!-- Capsule Connect Bar -->
+            <div class="capsule-search ios-glass">
+                <span class="search-ico">🔍</span>
+                <input type="text" id="connectUsernameInput" placeholder="Enter friend's @username to chat..." autocomplete="off" />
+                <button id="connectPeerBtn" class="capsule-go-btn">Chat</button>
             </div>
 
-            <!-- Home Tabs -->
-            <main class="home-content">
-                <div id="tabChats" class="tab-view active">
-                    <div class="section-label">
-                        <span>RECENT E2EE CHATS</span>
-                        <span class="e2ee-tag">🔒 AES-256</span>
+            <!-- Tabs -->
+            <main class="scroll-body">
+                <div id="tabChats" class="tab-pane active">
+                    <div class="list-header">
+                        <span>DIRECT MESSAGES</span>
+                        <span class="pill-e2ee">🔒 E2EE P2P</span>
                     </div>
-                    <div id="recentChatsList" class="chat-list"></div>
+                    <div id="recentChatsList" class="threads-stack"></div>
                 </div>
 
-                <div id="tabCalls" class="tab-view">
-                    <div class="section-label">
-                        <span>HD VOICE & VIDEO CALL LOGS</span>
+                <div id="tabCalls" class="tab-pane">
+                    <div class="list-header">
+                        <span>RECENT HD CALLS</span>
                     </div>
-                    <div id="callLogsList" class="chat-list"></div>
+                    <div id="callLogsList" class="threads-stack"></div>
                 </div>
 
-                <div id="tabVault" class="tab-view">
-                    <div class="glass-panel vault-card">
-                        <h3>🛡️ Saved Profile & Auto-Login</h3>
-                        <p class="muted">Permanent ID: <strong id="vaultUsernameDisplay">@user</strong></p>
-                        <p class="muted">Auto-Login Status: <strong style="color:#00e699;">Active (Saved on Device)</strong></p>
-                        <p class="muted">Offline Outbox Queue: <strong id="queueCountDisplay">0 files pending</strong></p>
-                        <div class="vault-actions">
-                            <button id="changeUserBtn" class="btn-secondary">✏️ Edit Profile / Username</button>
-                            <button id="clearCacheBtn" class="btn-danger">🗑️ Clear Local Chats</button>
+                <div id="tabProfile" class="tab-pane">
+                    <div class="ios-glass info-card">
+                        <h3>👤 Account & Connection</h3>
+                        <p class="dim">Username: <strong id="profileUserText">@user</strong></p>
+                        <p class="dim">Network Status: <strong id="networkStateText">Active</strong></p>
+                        <div class="btn-pair">
+                            <button id="switchAccountBtn" class="glass-sec-btn">🔄 Switch / Reset Name</button>
+                            <button id="clearChatsBtn" class="glass-danger-btn">🗑️ Clear Chats</button>
                         </div>
-                    </div>
-                    <div class="glass-panel vault-card">
-                        <h3>📱 Android .APK & App Install</h3>
-                        <p class="muted">Chrome menu se <b>"Install App / Add to Home Screen"</b> dabayein, ya GitHub Pages URL ko <b>PWABuilder / CapacitorJS</b> se pack karke direct <code>QuickChat-HD.apk</code> install karein.</p>
                     </div>
                 </div>
             </main>
 
-            <!-- Bottom Floating Liquid Dock -->
-            <nav class="glass-dock">
-                <button class="dock-btn active" data-tab="tabChats">
-                    <span>💬</span>
-                    <small>Chats</small>
+            <!-- Floating iOS Liquid Dock -->
+            <nav class="floating-dock ios-glass">
+                <button class="nav-pill active" data-tab="tabChats">
+                    <span class="nav-ico">💬</span>
+                    <span>Chats</span>
                 </button>
-                <button class="dock-btn" data-tab="tabCalls">
-                    <span>📞</span>
-                    <small>Calls</small>
+                <button class="nav-pill" data-tab="tabCalls">
+                    <span class="nav-ico">📞</span>
+                    <span>Calls</span>
                 </button>
-                <button class="dock-btn" data-tab="tabVault">
-                    <span>🛡️</span>
-                    <small>Security</small>
+                <button class="nav-pill" data-tab="tabProfile">
+                    <span class="nav-ico">⚙️</span>
+                    <span>Profile</span>
                 </button>
             </nav>
         </section>
 
-        <!-- 3. WHATSAPP-STYLE E2EE CHAT SCREEN -->
+        <!-- 3. LIVE P2P CHAT ROOM -->
         <section id="chatScreen" class="screen">
-            <header class="glass-header chat-header">
-                <div class="header-left">
-                    <button id="backHomeBtn" class="icon-btn">←</button>
-                    <div id="peerAvatar" class="avatar-circle">👤</div>
-                    <div class="peer-meta">
+            <header class="ios-topbar ios-glass">
+                <div class="user-chip">
+                    <button id="backHomeBtn" class="glass-circle-btn">←</button>
+                    <div id="peerAvatar" class="user-av">👤</div>
+                    <div>
                         <h3 id="peerNameTitle">@friend</h3>
-                        <span id="peerPresence" class="status-pill">Connecting...</span>
+                        <span id="peerPresence" class="peer-sub">Connecting...</span>
                     </div>
                 </div>
-                <div class="header-actions">
-                    <button id="audioCallBtn" class="icon-btn" title="HD Audio Call">📞</button>
-                    <button id="videoCallBtn" class="icon-btn" title="HD Video Call">📹</button>
-                    <button id="moreToolsBtn" class="icon-btn" title="Special Features">✨</button>
+                <div class="top-actions">
+                    <button id="audioCallBtn" class="glass-circle-btn" title="Voice Call">📞</button>
+                    <button id="videoCallBtn" class="glass-circle-btn" title="Video Call">📹</button>
+                    <button id="moreToolsBtn" class="glass-circle-btn" title="Extras">✨</button>
                 </div>
             </header>
 
-            <div id="e2eeBanner" class="e2ee-strip">
-                🔒 End-to-End Encrypted (ECDH P-256 + AES-GCM) • Safety Code: <strong id="safetyCodeText">----</strong>
+            <div class="encryption-bar">
+                🔒 End-to-End Encrypted • Safety Code: <strong id="safetyCodeText">SYNCING</strong>
             </div>
 
-            <div id="batchProgressBar" class="batch-banner hidden">
-                <div class="batch-top">
-                    <span id="batchStatusText">Streaming batch: 1 / 150</span>
+            <div id="batchProgressBar" class="transfer-bar hidden">
+                <div class="transfer-meta">
+                    <span id="batchStatusText">Sending media...</span>
                     <span id="batchPercentText">0%</span>
                 </div>
-                <div class="progress-track">
-                    <div id="batchProgressFill" class="progress-fill"></div>
-                </div>
+                <div class="bar-bg"><div id="batchProgressFill" class="bar-fill"></div></div>
             </div>
 
-            <!-- Messages Scroll Feed -->
-            <div id="messagesContainer" class="messages-feed"></div>
+            <!-- Messages Area -->
+            <div id="messagesContainer" class="chat-stream"></div>
 
-            <!-- Special Feature Drawer -->
-            <div id="specialDrawer" class="glass-panel special-drawer hidden">
-                <button type="button" class="tool-chip" id="toggleViewOnceBtn">1️⃣ View-Once: OFF</button>
-                <button type="button" class="tool-chip" id="toggleBurnBtn">🔥 Burn 10s: OFF</button>
-                <button type="button" class="tool-chip" id="openStegoBtn">🕵️ Secret Photo (Stego)</button>
-                <button type="button" class="tool-chip" id="openWatchPartyBtn">🎬 Watch Party</button>
-                <button type="button" class="tool-chip" id="startGameBtn">🎮 Tic-Tac-Toe</button>
+            <!-- Special Features Tray -->
+            <div id="specialDrawer" class="ios-glass extras-tray hidden">
+                <button type="button" class="chip-act" id="toggleViewOnceBtn">1️⃣ View-Once: OFF</button>
+                <button type="button" class="chip-act" id="toggleBurnBtn">🔥 Burn 10s: OFF</button>
+                <button type="button" class="chip-act" id="openStegoBtn">🕵️ Secret Photo</button>
+                <button type="button" class="chip-act" id="openWatchPartyBtn">🎬 Watch Party</button>
             </div>
 
-            <!-- Reply Preview Bar -->
-            <div id="replyBar" class="reply-bar hidden">
+            <!-- Reply Bar -->
+            <div id="replyBar" class="reply-strip hidden">
                 <div>
-                    <small class="accent">Replying to</small>
-                    <p id="replyPreviewText" class="truncate"></p>
+                    <small>Replying to</small>
+                    <p id="replyPreviewText"></p>
                 </div>
-                <button id="cancelReplyBtn" class="icon-btn">✕</button>
+                <button id="cancelReplyBtn" class="glass-circle-btn">✕</button>
             </div>
 
-            <!-- Chat Input Composer -->
-            <footer class="glass-composer">
+            <!-- Floating Glass Input Bar -->
+            <footer class="composer-bar ios-glass">
                 <input type="file" id="multiMediaInput" multiple accept="image/*,video/*,*/*" hidden />
-                <button id="attachBatchBtn" class="icon-btn" title="Send up to 100+ Photos & 50+ Videos">📎</button>
-                <input type="text" id="messageInput" placeholder="Write an encrypted message..." autocomplete="off" />
-                <button id="voiceNoteBtn" class="icon-btn" title="Tap for Voice Note">🎙️</button>
-                <button id="sendMsgBtn" class="send-btn liquid-btn">➤</button>
+                <button id="attachBatchBtn" class="glass-circle-btn" title="Send Photos/Videos">📎</button>
+                <input type="text" id="messageInput" placeholder="Message..." autocomplete="off" />
+                <button id="voiceNoteBtn" class="glass-circle-btn" title="Voice Note">🎙️</button>
+                <button id="sendMsgBtn" class="send-orb">➤</button>
             </footer>
         </section>
 
-        <!-- 4. HD VIDEO / AUDIO CALL & SCREEN SHARE OVERLAY -->
-        <div id="callOverlay" class="call-overlay hidden">
-            <div class="call-stage">
-                <video id="remoteVideo" autoplay playsinline></video>
-                <video id="localVideo" autoplay muted playsinline></video>
+        <!-- 4. HD VIDEO / AUDIO CALL SCREEN -->
+        <div id="callOverlay" class="call-screen hidden">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <video id="localVideo" autoplay muted playsinline></video>
 
-                <div class="call-top-info glass-panel">
-                    <span class="e2ee-tag">🔒 E2EE P2P Call</span>
-                    <h2 id="callPeerName">@friend</h2>
-                    <p id="callTimerText">Ringing...</p>
-                </div>
+            <div class="call-header ios-glass">
+                <span class="pill-e2ee">🔒 E2EE HD CALL</span>
+                <h2 id="callPeerName">@friend</h2>
+                <p id="callTimerText">Calling...</p>
+            </div>
 
-                <div id="incomingCallControls" class="call-controls hidden">
-                    <button id="acceptCallBtn" class="call-action accept">📞 Accept</button>
-                    <button id="rejectCallBtn" class="call-action reject">✕ Decline</button>
-                </div>
+            <div id="incomingCallControls" class="call-dock hidden">
+                <button id="acceptCallBtn" class="btn-call-yes">📞 Accept</button>
+                <button id="rejectCallBtn" class="btn-call-no">✕ Decline</button>
+            </div>
 
-                <div id="activeCallControls" class="call-controls glass-panel">
-                    <button id="toggleMicBtn" class="ctrl-btn">🎤</button>
-                    <button id="toggleCamBtn" class="ctrl-btn">📷</button>
-                    <button id="shareScreenBtn" class="ctrl-btn" title="Share Screen">🖥️</button>
-                    <button id="endCallBtn" class="call-action reject">End</button>
-                </div>
+            <div id="activeCallControls" class="call-dock ios-glass">
+                <button id="toggleMicBtn" class="glass-circle-btn">🎤</button>
+                <button id="toggleCamBtn" class="glass-circle-btn">📷</button>
+                <button id="endCallBtn" class="btn-call-no">End Call</button>
             </div>
         </div>
 
-        <!-- 5. MY QR CODE MODAL -->
-        <div id="qrModal" class="modal-backdrop hidden">
-            <div class="glass-card modal-box liquid-pop">
-                <h3>📲 My Connect QR</h3>
-                <p class="muted">Dost ko yeh QR scan karwayein ya <strong>@<span id="qrUserLabel">user</span></strong> search karein</p>
-                <div id="qrcodeContainer" class="qr-box"></div>
-                <button id="closeQrBtn" class="btn-primary">Close</button>
+        <!-- 5. MY QR MODAL -->
+        <div id="qrModal" class="modal-mask hidden">
+            <div class="ios-glass modal-card">
+                <h3>📲 Scan to Chat</h3>
+                <p class="dim">Username: <strong>@<span id="qrUserLabel"></span></strong></p>
+                <div id="qrcodeContainer" class="qr-white"></div>
+                <button id="closeQrBtn" class="ios-primary-btn">Done</button>
             </div>
         </div>
 
-        <!-- 6. LIVE QR CAMERA SCANNER MODAL -->
-        <div id="qrScannerModal" class="modal-backdrop hidden">
-            <div class="glass-card modal-box liquid-pop">
+        <!-- 6. QR SCANNER MODAL -->
+        <div id="qrScannerModal" class="modal-mask hidden">
+            <div class="ios-glass modal-card">
                 <h3>📷 Scan Friend's QR</h3>
-                <p class="muted">Dost ke QuickChat QR par camera rakhein</p>
-                <div id="qrReaderBox" style="width:100%;margin:12px 0;border-radius:14px;overflow:hidden;"></div>
-                <button id="closeScannerBtn" class="btn-secondary" style="width:100%;">Cancel</button>
+                <div id="qrReaderBox" style="width:100%;margin:12px 0;border-radius:16px;overflow:hidden;"></div>
+                <button id="closeScannerBtn" class="glass-sec-btn" style="width:100%;">Cancel</button>
             </div>
         </div>
 
-        <!-- 7. INVISIBLE STEGANOGRAPHY MODAL -->
-        <div id="stegoModal" class="modal-backdrop hidden">
-            <div class="glass-card modal-box liquid-pop">
-                <h3>🕵️ Invisible Pixel Steganography</h3>
-                <p class="muted">Normal photo ke pixels ke andar secret encrypted text chhupayein!</p>
-                <input type="file" id="stegoImageInput" accept="image/*" class="file-box" />
-                <input type="text" id="stegoSecretInput" placeholder="Secret message likhein..." />
-                <div class="modal-row">
-                    <button id="sendStegoBtn" class="btn-primary">Hide & Send</button>
-                    <button id="closeStegoBtn" class="btn-secondary">Cancel</button>
+        <!-- 7. STEGANOGRAPHY MODAL -->
+        <div id="stegoModal" class="modal-mask hidden">
+            <div class="ios-glass modal-card">
+                <h3>🕵️ Hide Secret in Photo</h3>
+                <input type="file" id="stegoImageInput" accept="image/*" style="margin:10px 0;width:100%;" />
+                <div class="ios-input-wrap" style="margin-bottom:12px;">
+                    <input type="text" id="stegoSecretInput" placeholder="Enter secret message..." />
+                </div>
+                <div class="btn-pair">
+                    <button id="sendStegoBtn" class="ios-primary-btn">Send</button>
+                    <button id="closeStegoBtn" class="glass-sec-btn">Cancel</button>
                 </div>
             </div>
         </div>
 
-        <!-- 8. WATCH PARTY SYNC MODAL -->
-        <div id="watchPartyModal" class="modal-backdrop hidden">
-            <div class="glass-card modal-box liquid-pop">
-                <h3>🎬 P2P Watch Party (Synced)</h3>
-                <p class="muted">Dono ke device par exact same millisecond par play/pause sync hoga!</p>
-                <input type="file" id="watchFileInput" accept="video/*,audio/*" class="file-box" />
-                <video id="watchPartyPlayer" controls class="watch-video"></video>
-                <button id="closeWatchBtn" class="btn-secondary" style="width:100%;">Close Player</button>
-            </div>
-        </div>
-
-        <!-- 9. FULLSCREEN MEDIA LIGHTBOX -->
-        <div id="mediaLightbox" class="modal-backdrop hidden">
-            <div class="lightbox-wrap">
-                <button id="closeLightboxBtn" class="icon-btn close-lb">✕</button>
-                <div id="lightboxContent"></div>
+        <!-- 8. WATCH PARTY MODAL -->
+        <div id="watchPartyModal" class="modal-mask hidden">
+            <div class="ios-glass modal-card">
+                <h3>🎬 Synced Watch Party</h3>
+                <input type="file" id="watchFileInput" accept="video/*,audio/*" style="margin:10px 0;width:100%;" />
+                <video id="watchPartyPlayer" controls style="width:100%;border-radius:14px;max-height:200px;background:#000;"></video>
+                <button id="closeWatchBtn" class="glass-sec-btn" style="width:100%;margin-top:10px;">Close</button>
             </div>
         </div>
     </div>
