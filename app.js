@@ -1,5 +1,5 @@
-// QuickChat HD v6.2 — Complete Verified Edition (Bulletproof Camera Toggle + Cooldown + Mute/Cam + E2EE + Batch Media + Extras)
-const PEER_PREFIX = "qchd-live-v6-";
+// QuickChat HD v7.0 — Universal Mobile + Desktop Video Fix + Auto-Cache Buster + E2EE
+const PEER_PREFIX = "qchd-live-v7-";
 const CHUNK_SIZE = 65536;
 
 let peer = null;
@@ -8,7 +8,6 @@ let outboxQueues = {};
 let activeMediaCall = null;
 let localStream = null;
 
-// Fresh storage key so no old cached name shows up
 let myProfile = JSON.parse(localStorage.getItem("qchd_v6_profile") || "null");
 let chatStore = JSON.parse(localStorage.getItem("qchd_v6_chats") || "{}");
 let callLogs = JSON.parse(localStorage.getItem("qchd_v6_calls") || "[]");
@@ -34,8 +33,11 @@ window.addEventListener("pointermove", e => {
 }, { passive: true });
 
 window.addEventListener("DOMContentLoaded", () => {
+    // Force clear any old cached Service Worker so phone loads latest code immediately
     if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("sw.js").catch(() => {});
+        navigator.serviceWorker.getRegistrations().then(regs => {
+            regs.forEach(r => r.unregister());
+        }).catch(() => {});
     }
 
     document.querySelectorAll(".av-btn").forEach(btn => {
@@ -101,7 +103,8 @@ function initPeer(username) {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:19302" }
+                { urls: "stun:stun2.l.google.com:19302" },
+                { urls: "stun:global.stun.twilio.com:3478" }
             ]
         }
     });
@@ -231,6 +234,12 @@ async function onReceiveData(sender, data) {
             document.getElementById("safetyCodeText").textContent = `${hash[0]}${hash[1]}${hash[2]}`.slice(0, 6);
         }
         renderRecentChats();
+        return;
+    }
+
+    if (data.type === "cam-state") {
+        const remoteVid = document.getElementById("remoteVideo");
+        if (remoteVid) remoteVid.style.opacity = data.enabled ? "1" : "0.15";
         return;
     }
 
@@ -453,25 +462,38 @@ async function sendFilesBatch(files) {
 }
 
 // ==========================================
-// 3. HD VOICE/VIDEO CALLS + BULLETPROOF CAMERA TOGGLE (NO BLACK SCREEN)
+// 3. UNIVERSAL MOBILE + DESKTOP HD CALLS & CAMERA FIX
 // ==========================================
 document.getElementById("videoCallBtn").addEventListener("click", () => startCall(true));
 document.getElementById("audioCallBtn").addEventListener("click", () => startCall(false));
 
+async function getSafeMediaStream(wantVideo) {
+    try {
+        return await navigator.mediaDevices.getUserMedia({
+            video: wantVideo ? { facingMode: "user" } : false,
+            audio: true
+        });
+    } catch {
+        // Fallback if facingMode fails on some laptops/phones
+        return await navigator.mediaDevices.getUserMedia({
+            video: wantVideo,
+            audio: true
+        });
+    }
+}
+
 async function startCall(video) {
     if (!currentPeerUser) return;
     closeCallUI();
-    await new Promise(r => setTimeout(r, 180)); // Hardware camera release cooldown
+    await new Promise(r => setTimeout(r, 250));
 
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false,
-            audio: true
-        });
+        localStream = await getSafeMediaStream(video);
 
         const localVid = document.getElementById("localVideo");
+        localVid.muted = true;
+        localVid.playsInline = true;
         localVid.style.opacity = "1";
-        localVid.srcObject = null;
         localVid.srcObject = localStream;
         await localVid.play().catch(() => {});
 
@@ -486,8 +508,8 @@ async function startCall(video) {
             metadata: { caller: myProfile.username, video }
         });
         wireCall(call, video ? "Video Call" : "Audio Call");
-    } catch {
-        alert("Camera/Mic busy hai—ek baar browser tab refresh karke try karein.");
+    } catch (err) {
+        alert("Camera/Mic access error: " + err.message);
     }
 }
 
@@ -507,16 +529,14 @@ function handleIncomingCall(call) {
             localStream.getTracks().forEach(t => t.stop());
             localStream = null;
         }
-        await new Promise(r => setTimeout(r, 180));
+        await new Promise(r => setTimeout(r, 250));
 
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false,
-            audio: true
-        });
+        localStream = await getSafeMediaStream(video);
 
         const localVid = document.getElementById("localVideo");
+        localVid.muted = true;
+        localVid.playsInline = true;
         localVid.style.opacity = "1";
-        localVid.srcObject = null;
         localVid.srcObject = localStream;
         await localVid.play().catch(() => {});
 
@@ -538,7 +558,8 @@ function wireCall(call, type) {
 
     call.on("stream", async remote => {
         const remoteVid = document.getElementById("remoteVideo");
-        remoteVid.srcObject = null;
+        remoteVid.playsInline = true;
+        remoteVid.style.opacity = "1";
         remoteVid.srcObject = remote;
         await remoteVid.play().catch(() => {});
 
@@ -567,35 +588,21 @@ document.getElementById("toggleMicBtn").addEventListener("click", e => {
     e.currentTarget.style.background = track.enabled ? "rgba(255, 255, 255, 0.1)" : "#ef4444";
 });
 
-// 100% Bulletproof Camera Toggle (Never destroys active WebRTC stream; zero black screen on repeat toggles)
+// Working Camera Toggle Button (Toggle track.enabled without killing WebRTC stream)
 document.getElementById("toggleCamBtn").addEventListener("click", async e => {
     const btn = e.currentTarget;
     if (!localStream) return;
 
-    let videoTrack = localStream.getVideoTracks()[0];
-
-    if (!videoTrack || videoTrack.readyState === "ended") {
-        try {
-            const camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            videoTrack = camStream.getVideoTracks()[0];
-            localStream.addTrack(videoTrack);
-
-            if (activeMediaCall && activeMediaCall.peerConnection) {
-                const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track && s.track.kind === "video");
-                if (sender) await sender.replaceTrack(videoTrack);
-                else activeMediaCall.peerConnection.addTrack(videoTrack, localStream);
-            }
-        } catch {
-            alert("Camera access denied or busy in another app.");
-            return;
-        }
-    } else {
-        videoTrack.enabled = !videoTrack.enabled;
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (!videoTrack) {
+        alert("This is an Audio Call.");
+        return;
     }
 
+    videoTrack.enabled = !videoTrack.enabled;
     const localVid = document.getElementById("localVideo");
+
     if (videoTrack.enabled) {
-        localVid.srcObject = localStream;
         localVid.style.opacity = "1";
         await localVid.play().catch(() => {});
         btn.textContent = "📷";
@@ -604,6 +611,10 @@ document.getElementById("toggleCamBtn").addEventListener("click", async e => {
         localVid.style.opacity = "0.15";
         btn.textContent = "🚫";
         btn.style.background = "#ef4444";
+    }
+
+    if (currentPeerUser) {
+        sendPacket(currentPeerUser, { type: "cam-state", enabled: videoTrack.enabled });
     }
 });
 
