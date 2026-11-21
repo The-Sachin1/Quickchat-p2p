@@ -483,9 +483,9 @@ body {
 
 .call-screen { position: fixed; inset: 0; z-index: 50; background: #02050c; }
 #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-#localVideo { position: absolute; bottom: 110px; right: 16px; width: 110px; height: 155px; border-radius: 18px; object-fit: cover; border: 2px solid #fff; }
-.call-header { position: absolute; top: 24px; left: 20px; right: 20px; padding: 14px; border-radius: 24px; text-align: center; }
-.call-dock { position: absolute; bottom: 26px; left: 24px; right: 24px; padding: 12px; border-radius: 99px; display: flex; justify-content: center; gap: 14px; }
+#localVideo { position: absolute; bottom: 110px; right: 16px; width: 110px; height: 155px; border-radius: 18px; object-fit: cover; border: 2px solid #fff; z-index: 52; }
+.call-header { position: absolute; top: 24px; left: 20px; right: 20px; padding: 14px; border-radius: 24px; text-align: center; z-index: 53; }
+.call-dock { position: absolute; bottom: 26px; left: 24px; right: 24px; padding: 12px; border-radius: 99px; display: flex; justify-content: center; gap: 14px; z-index: 53; }
 .btn-call-yes { background: #10b981; color: #fff; border: none; padding: 12px 24px; border-radius: 99px; font-weight: 700; cursor: pointer; }
 .btn-call-no { background: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 99px; font-weight: 700; cursor: pointer; }
 
