@@ -1,4 +1,4 @@
-// QuickChat HD v6.0 — Complete Verified Edition (All Buttons, Mute/Cam, E2EE, Batch Media, Stego, Watch Party, Game)
+// QuickChat HD v6.1 — Complete Verified Edition (Camera Black-Screen Fix + Mute/Cam + E2EE + Batch Media + Extras)
 const PEER_PREFIX = "qchd-live-v6-";
 const CHUNK_SIZE = 65536;
 
@@ -453,16 +453,26 @@ async function sendFilesBatch(files) {
 }
 
 // ==========================================
-// 3. HD VOICE/VIDEO CALLS + WORKING MUTE, CAM & SCREEN SHARE
+// 3. HD VOICE/VIDEO CALLS + BLACK-SCREEN FIX + WORKING MUTE/CAM
 // ==========================================
 document.getElementById("videoCallBtn").addEventListener("click", () => startCall(true));
 document.getElementById("audioCallBtn").addEventListener("click", () => startCall(false));
 
 async function startCall(video) {
     if (!currentPeerUser) return;
+    closeCallUI(); // Ensure any stale camera stream is released first
+
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
-        document.getElementById("localVideo").srcObject = localStream;
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: video ? { facingMode: "user" } : false,
+            audio: true
+        });
+
+        const localVid = document.getElementById("localVideo");
+        localVid.srcObject = null;
+        localVid.srcObject = localStream;
+        await localVid.play().catch(() => {});
+
         resetCallButtonsUI();
         document.getElementById("callPeerName").textContent = `@${currentPeerUser}`;
         document.getElementById("callTimerText").textContent = "Calling...";
@@ -470,7 +480,9 @@ async function startCall(video) {
         document.getElementById("activeCallControls").classList.remove("hidden");
         document.getElementById("callOverlay").classList.remove("hidden");
 
-        const call = peer.call(PEER_PREFIX + currentPeerUser, localStream, { metadata: { caller: myProfile.username, video } });
+        const call = peer.call(PEER_PREFIX + currentPeerUser, localStream, {
+            metadata: { caller: myProfile.username, video }
+        });
         wireCall(call, video ? "Video Call" : "Audio Call");
     } catch {
         alert("Camera/Microphone permission required.");
@@ -480,6 +492,7 @@ async function startCall(video) {
 function handleIncomingCall(call) {
     const caller = call.metadata?.caller || call.peer.replace(PEER_PREFIX, "");
     const video = call.metadata?.video ?? true;
+
     resetCallButtonsUI();
     document.getElementById("callPeerName").textContent = `@${caller}`;
     document.getElementById("callTimerText").textContent = video ? "Incoming HD Video Call..." : "Incoming Voice Call...";
@@ -488,27 +501,49 @@ function handleIncomingCall(call) {
     document.getElementById("callOverlay").classList.remove("hidden");
 
     document.getElementById("acceptCallBtn").onclick = async () => {
-        localStream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
-        document.getElementById("localVideo").srcObject = localStream;
+        if (localStream) {
+            localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+        }
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: video ? { facingMode: "user" } : false,
+            audio: true
+        });
+
+        const localVid = document.getElementById("localVideo");
+        localVid.srcObject = null;
+        localVid.srcObject = localStream;
+        await localVid.play().catch(() => {});
+
         call.answer(localStream);
         document.getElementById("incomingCallControls").classList.add("hidden");
         document.getElementById("activeCallControls").classList.remove("hidden");
         wireCall(call, video ? "Video Call" : "Audio Call");
     };
-    document.getElementById("rejectCallBtn").onclick = () => { call.close(); closeCallUI(); };
+
+    document.getElementById("rejectCallBtn").onclick = () => {
+        call.close();
+        closeCallUI();
+    };
 }
 
 function wireCall(call, type) {
     activeMediaCall = call;
     let sec = 0;
-    call.on("stream", remote => {
-        document.getElementById("remoteVideo").srcObject = remote;
+
+    call.on("stream", async remote => {
+        const remoteVid = document.getElementById("remoteVideo");
+        remoteVid.srcObject = null;
+        remoteVid.srcObject = remote;
+        await remoteVid.play().catch(() => {});
+
         clearInterval(callTimerInterval);
         callTimerInterval = setInterval(() => {
             sec++;
             document.getElementById("callTimerText").textContent = `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
         }, 1000);
     });
+
     call.on("close", () => {
         callLogs.unshift({ user: currentPeerUser || "Friend", type, duration: `${sec}s`, time: nowTime() });
         localStorage.setItem("qchd_v6_calls", JSON.stringify(callLogs));
@@ -527,14 +562,42 @@ document.getElementById("toggleMicBtn").addEventListener("click", e => {
     e.currentTarget.style.background = track.enabled ? "rgba(255, 255, 255, 0.1)" : "#ef4444";
 });
 
-// Working Camera Toggle Button
-document.getElementById("toggleCamBtn").addEventListener("click", e => {
+// Working Camera Toggle Button (Releases hardware on OFF & re-acquires fresh stream on ON — zero black screen)
+document.getElementById("toggleCamBtn").addEventListener("click", async e => {
+    const btn = e.currentTarget;
     if (!localStream) return;
-    const track = localStream.getVideoTracks()[0];
-    if (!track) return;
-    track.enabled = !track.enabled;
-    e.currentTarget.textContent = track.enabled ? "📷" : "🚫";
-    e.currentTarget.style.background = track.enabled ? "rgba(255, 255, 255, 0.1)" : "#ef4444";
+
+    const existingTrack = localStream.getVideoTracks()[0];
+
+    if (existingTrack && existingTrack.enabled && existingTrack.readyState === "live") {
+        existingTrack.enabled = false;
+        existingTrack.stop();
+        btn.textContent = "🚫";
+        btn.style.background = "#ef4444";
+    } else {
+        try {
+            const freshCamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            const newVideoTrack = freshCamStream.getVideoTracks()[0];
+
+            localStream.getVideoTracks().forEach(t => localStream.removeTrack(t));
+            localStream.addTrack(newVideoTrack);
+
+            const localVid = document.getElementById("localVideo");
+            localVid.srcObject = null;
+            localVid.srcObject = localStream;
+            await localVid.play().catch(() => {});
+
+            if (activeMediaCall && activeMediaCall.peerConnection) {
+                const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track && s.track.kind === "video");
+                if (sender) await sender.replaceTrack(newVideoTrack);
+            }
+
+            btn.textContent = "📷";
+            btn.style.background = "rgba(255, 255, 255, 0.1)";
+        } catch {
+            alert("Camera could not restart. Check if another tab is using the camera.");
+        }
+    }
 });
 
 // Working Screen Share Button
@@ -544,8 +607,10 @@ document.getElementById("shareScreenBtn").addEventListener("click", async () => 
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         const screenTrack = screenStream.getVideoTracks()[0];
         const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track && s.track.kind === "video");
-        if (sender) sender.replaceTrack(screenTrack);
-        document.getElementById("localVideo").srcObject = screenStream;
+        if (sender) await sender.replaceTrack(screenTrack);
+        const localVid = document.getElementById("localVideo");
+        localVid.srcObject = screenStream;
+        await localVid.play().catch(() => {});
     } catch {}
 });
 
@@ -565,8 +630,20 @@ function resetCallButtonsUI() {
 
 function closeCallUI() {
     clearInterval(callTimerInterval);
-    localStream?.getTracks().forEach(t => t.stop());
-    localStream = null;
+    if (localStream) {
+        localStream.getTracks().forEach(t => {
+            t.enabled = false;
+            t.stop();
+        });
+        localStream = null;
+    }
+    const localVid = document.getElementById("localVideo");
+    const remoteVid = document.getElementById("remoteVideo");
+    localVid.pause();
+    localVid.srcObject = null;
+    remoteVid.pause();
+    remoteVid.srcObject = null;
+
     activeMediaCall = null;
     document.getElementById("callOverlay").classList.add("hidden");
 }
