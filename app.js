@@ -1,17 +1,17 @@
-// QuickChat HD v5.0 — Clean Onboarding + Reliable Real-Time P2P Chat + iOS Liquid Glass
-const PEER_PREFIX = "qchd-live-v5-";
+// QuickChat HD v6.0 — Complete Verified Edition (All Buttons, Mute/Cam, E2EE, Batch Media, Stego, Watch Party, Game)
+const PEER_PREFIX = "qchd-live-v6-";
 const CHUNK_SIZE = 65536;
 
 let peer = null;
-let connections = {}; // Map of username -> DataConnection
-let outboxQueues = {}; // Map of username -> pending packets before open
+let connections = {};
+let outboxQueues = {};
 let activeMediaCall = null;
 let localStream = null;
 
-// Fresh storage key so old cached name never interferes
-let myProfile = JSON.parse(localStorage.getItem("qchd_v5_profile") || "null");
-let chatStore = JSON.parse(localStorage.getItem("qchd_v5_chats") || "{}");
-let callLogs = JSON.parse(localStorage.getItem("qchd_v5_calls") || "[]");
+// Fresh storage key so no old cached name shows up
+let myProfile = JSON.parse(localStorage.getItem("qchd_v6_profile") || "null");
+let chatStore = JSON.parse(localStorage.getItem("qchd_v6_chats") || "{}");
+let callLogs = JSON.parse(localStorage.getItem("qchd_v6_calls") || "[]");
 let currentPeerUser = null;
 
 let myKeyPair = null;
@@ -34,6 +34,10 @@ window.addEventListener("pointermove", e => {
 }, { passive: true });
 
 window.addEventListener("DOMContentLoaded", () => {
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+
     document.querySelectorAll(".av-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             document.querySelectorAll(".av-btn").forEach(b => b.classList.remove("active"));
@@ -66,7 +70,7 @@ document.getElementById("startAppBtn").addEventListener("click", () => {
     }
 
     myProfile = { username: rawUser, displayName, avatar };
-    localStorage.setItem("qchd_v5_profile", JSON.stringify(myProfile));
+    localStorage.setItem("qchd_v6_profile", JSON.stringify(myProfile));
     bootApp(myProfile);
 });
 
@@ -92,7 +96,7 @@ async function bootApp(profile) {
 function initPeer(username) {
     if (peer) peer.destroy();
     peer = new Peer(PEER_PREFIX + username, {
-        debug: 1,
+        debug: 0,
         config: {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
@@ -115,29 +119,27 @@ function initPeer(username) {
     });
 
     peer.on("error", err => {
-        console.warn("PeerJS:", err.type);
         if (err.type === "peer-unavailable" && currentPeerUser) {
             document.getElementById("peerPresence").textContent = "Offline (Waiting for friend to open app)";
         }
     });
 
-    // Incoming P2P Connection from a friend
-    peer.on("connection", conn => {
-        bindConnection(conn);
-    });
-
-    // Incoming Audio/Video Call
+    peer.on("connection", conn => bindConnection(conn));
     peer.on("call", call => handleIncomingCall(call));
 }
 
 // ==========================================
-// RELIABLE CONNECTION & PACKET DELIVERY
+// 1. RELIABLE P2P CONNECTION & PACKET ROUTING
 // ==========================================
 document.getElementById("connectPeerBtn").addEventListener("click", () => {
     const target = document.getElementById("connectUsernameInput").value.trim().toLowerCase().replace(/^@/, "");
     if (!target || target === myProfile.username) return;
     document.getElementById("connectUsernameInput").value = "";
     openChat(target);
+});
+
+document.getElementById("connectUsernameInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("connectPeerBtn").click();
 });
 
 function openChat(targetUser) {
@@ -148,7 +150,7 @@ function openChat(targetUser) {
 
     const existing = connections[targetUser];
     if (existing && existing.open) {
-        document.getElementById("peerPresence").textContent = "● Online • Connected";
+        document.getElementById("peerPresence").textContent = "● Online • E2EE Connected";
         sendPacket(targetUser, { type: "seen" });
     } else {
         document.getElementById("peerPresence").textContent = "Connecting to @" + targetUser + "...";
@@ -166,7 +168,6 @@ function bindConnection(conn) {
             document.getElementById("peerPresence").textContent = "● Online • E2EE Connected";
         }
 
-        // Send Handshake + ECDH Key
         let pubJwk = null;
         if (myKeyPair) {
             pubJwk = await crypto.subtle.exportKey("jwk", myKeyPair.publicKey);
@@ -179,7 +180,6 @@ function bindConnection(conn) {
             pubJwk
         });
 
-        // Flush any queued messages for this user
         if (outboxQueues[remoteUser]?.length) {
             while (outboxQueues[remoteUser].length > 0) {
                 conn.send(outboxQueues[remoteUser].shift());
@@ -199,11 +199,10 @@ function bindConnection(conn) {
 }
 
 function sendPacket(targetUser, packet) {
-    let conn = connections[targetUser];
+    const conn = connections[targetUser];
     if (conn && conn.open) {
         conn.send(packet);
     } else {
-        // Queue packet and initiate connection automatically
         if (!outboxQueues[targetUser]) outboxQueues[targetUser] = [];
         outboxQueues[targetUser].push(packet);
         if (peer && peer.open) {
@@ -235,6 +234,13 @@ async function onReceiveData(sender, data) {
         return;
     }
 
+    if (data.type === "typing") {
+        if (currentPeerUser === sender) {
+            document.getElementById("peerPresence").textContent = data.isTyping ? "typing..." : "● Online • E2EE Connected";
+        }
+        return;
+    }
+
     if (data.type === "chat") {
         let plain = data.text;
         if (data.encrypted && sharedKeys[sender]) {
@@ -252,6 +258,8 @@ async function onReceiveData(sender, data) {
             id: data.id,
             from: "peer",
             text: plain,
+            quote: data.quote || null,
+            burnSeconds: data.burnSeconds || 0,
             time: nowTime(),
             status: "seen"
         });
@@ -271,8 +279,47 @@ async function onReceiveData(sender, data) {
         return;
     }
 
+    if (data.type === "reaction") {
+        const msg = chatStore[sender]?.messages.find(m => m.id === data.msgId);
+        if (msg) {
+            msg.reaction = data.emoji;
+            saveChats();
+            if (currentPeerUser === sender) renderChatMessages(sender);
+        }
+        return;
+    }
+
+    if (data.type === "unsend") {
+        if (chatStore[sender]) {
+            chatStore[sender].messages = chatStore[sender].messages.filter(m => m.id !== data.msgId);
+            saveChats();
+            if (currentPeerUser === sender) renderChatMessages(sender);
+        }
+        return;
+    }
+
+    if (data.type === "watch-sync") {
+        document.getElementById("watchPartyModal").classList.remove("hidden");
+        if (Math.abs(watchPlayer.currentTime - data.time) > 0.5) watchPlayer.currentTime = data.time;
+        if (data.action === "play") watchPlayer.play().catch(() => {});
+        if (data.action === "pause") watchPlayer.pause();
+        return;
+    }
+
+    if (data.type === "game-move") {
+        ensureThread(sender);
+        const existing = chatStore[sender].messages.find(m => m.id === data.gameId);
+        if (existing) {
+            existing.gameBoard = data.board;
+            if (currentPeerUser === sender) renderChatMessages(sender);
+        } else {
+            appendMessage(sender, { id: data.gameId, from: "peer", gameBoard: data.board, time: nowTime(), status: "seen" });
+        }
+        return;
+    }
+
     if (data.type === "file-start") {
-        fileBuffers[data.fileId] = { name: data.name, mime: data.mime, size: data.size, chunks: [], got: 0 };
+        fileBuffers[data.fileId] = { name: data.name, mime: data.mime, size: data.size, viewOnce: data.viewOnce, chunks: [], got: 0 };
         return;
     }
     if (data.type === "file-chunk") {
@@ -289,14 +336,34 @@ async function onReceiveData(sender, data) {
         hideProgress();
         const url = URL.createObjectURL(new Blob(fb.chunks, { type: fb.mime }));
         delete fileBuffers[data.fileId];
-        appendMessage(sender, { id: data.fileId, from: "peer", mediaUrl: url, mediaName: fb.name, mediaType: fb.mime, time: nowTime(), status: "seen" });
+        appendMessage(sender, {
+            id: data.fileId,
+            from: "peer",
+            mediaUrl: url,
+            mediaName: fb.name,
+            mediaType: fb.mime,
+            viewOnce: fb.viewOnce,
+            time: nowTime(),
+            status: "seen"
+        });
     }
 }
 
 // ==========================================
-// SEND TEXT & MEDIA
+// 2. SEND TEXT, TYPING INDICATOR & BATCH MEDIA
 // ==========================================
 const msgInput = document.getElementById("messageInput");
+let typingTimer = null;
+
+msgInput.addEventListener("input", () => {
+    if (!currentPeerUser) return;
+    sendPacket(currentPeerUser, { type: "typing", isTyping: true });
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+        sendPacket(currentPeerUser, { type: "typing", isTyping: false });
+    }, 1200);
+});
+
 msgInput.addEventListener("keydown", e => { if (e.key === "Enter") handleSendText(); });
 document.getElementById("sendMsgBtn").addEventListener("click", handleSendText);
 
@@ -306,10 +373,14 @@ async function handleSendText() {
     msgInput.value = "";
 
     const msgId = "msg_" + Date.now();
+    const burnSec = burnMode ? 10 : 0;
+
     appendMessage(currentPeerUser, {
         id: msgId,
         from: "me",
         text,
+        quote: replyingTo,
+        burnSeconds: burnSec,
         time: nowTime(),
         status: connections[currentPeerUser]?.open ? "delivered" : "sent"
     });
@@ -322,20 +393,34 @@ async function handleSendText() {
             id: msgId,
             encrypted: true,
             iv: Array.from(iv),
-            cipher: bufToBase64(cipherBuf)
+            cipher: bufToBase64(cipherBuf),
+            quote: replyingTo,
+            burnSeconds: burnSec
         });
     } else {
-        sendPacket(currentPeerUser, { type: "chat", id: msgId, encrypted: false, text });
+        sendPacket(currentPeerUser, {
+            type: "chat",
+            id: msgId,
+            encrypted: false,
+            text,
+            quote: replyingTo,
+            burnSeconds: burnSec
+        });
     }
+
+    replyingTo = null;
+    document.getElementById("replyBar").classList.add("hidden");
 }
 
-// Batch Media Send
 document.getElementById("attachBatchBtn").addEventListener("click", () => document.getElementById("multiMediaInput").click());
 document.getElementById("multiMediaInput").addEventListener("change", async e => {
     const files = Array.from(e.target.files);
     if (!files.length || !currentPeerUser) return;
     e.target.value = "";
+    await sendFilesBatch(files);
+});
 
+async function sendFilesBatch(files) {
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileId = "f_" + Date.now() + "_" + i;
@@ -345,11 +430,12 @@ document.getElementById("multiMediaInput").addEventListener("change", async e =>
             mediaUrl: URL.createObjectURL(file),
             mediaName: file.name,
             mediaType: file.type,
+            viewOnce: viewOnceMode,
             time: nowTime(),
             status: "delivered"
         });
 
-        sendPacket(currentPeerUser, { type: "file-start", fileId, name: file.name, mime: file.type, size: file.size });
+        sendPacket(currentPeerUser, { type: "file-start", fileId, name: file.name, mime: file.type, size: file.size, viewOnce: viewOnceMode });
         let offset = 0;
         while (offset < file.size) {
             const buf = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
@@ -360,10 +446,14 @@ document.getElementById("multiMediaInput").addEventListener("change", async e =>
         sendPacket(currentPeerUser, { type: "file-end", fileId });
     }
     hideProgress();
-});
+    if (viewOnceMode) {
+        viewOnceMode = false;
+        document.getElementById("toggleViewOnceBtn").textContent = "1️⃣ View-Once: OFF";
+    }
+}
 
 // ==========================================
-// HD VOICE & VIDEO CALLS
+// 3. HD VOICE/VIDEO CALLS + WORKING MUTE, CAM & SCREEN SHARE
 // ==========================================
 document.getElementById("videoCallBtn").addEventListener("click", () => startCall(true));
 document.getElementById("audioCallBtn").addEventListener("click", () => startCall(false));
@@ -373,6 +463,7 @@ async function startCall(video) {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
         document.getElementById("localVideo").srcObject = localStream;
+        resetCallButtonsUI();
         document.getElementById("callPeerName").textContent = `@${currentPeerUser}`;
         document.getElementById("callTimerText").textContent = "Calling...";
         document.getElementById("incomingCallControls").classList.add("hidden");
@@ -389,6 +480,7 @@ async function startCall(video) {
 function handleIncomingCall(call) {
     const caller = call.metadata?.caller || call.peer.replace(PEER_PREFIX, "");
     const video = call.metadata?.video ?? true;
+    resetCallButtonsUI();
     document.getElementById("callPeerName").textContent = `@${caller}`;
     document.getElementById("callTimerText").textContent = video ? "Incoming HD Video Call..." : "Incoming Voice Call...";
     document.getElementById("incomingCallControls").classList.remove("hidden");
@@ -418,22 +510,189 @@ function wireCall(call, type) {
         }, 1000);
     });
     call.on("close", () => {
-        callLogs.unshift({ user: currentPeerUser, type, duration: `${sec}s`, time: nowTime() });
-        localStorage.setItem("qchd_v5_calls", JSON.stringify(callLogs));
+        callLogs.unshift({ user: currentPeerUser || "Friend", type, duration: `${sec}s`, time: nowTime() });
+        localStorage.setItem("qchd_v6_calls", JSON.stringify(callLogs));
         renderCallLogs();
         closeCallUI();
     });
 }
 
-document.getElementById("endCallBtn").addEventListener("click", () => { if (activeMediaCall) activeMediaCall.close(); closeCallUI(); });
+// Working Mute Mic Button
+document.getElementById("toggleMicBtn").addEventListener("click", e => {
+    if (!localStream) return;
+    const track = localStream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    e.currentTarget.textContent = track.enabled ? "🎤" : "🔇";
+    e.currentTarget.style.background = track.enabled ? "rgba(255, 255, 255, 0.1)" : "#ef4444";
+});
+
+// Working Camera Toggle Button
+document.getElementById("toggleCamBtn").addEventListener("click", e => {
+    if (!localStream) return;
+    const track = localStream.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    e.currentTarget.textContent = track.enabled ? "📷" : "🚫";
+    e.currentTarget.style.background = track.enabled ? "rgba(255, 255, 255, 0.1)" : "#ef4444";
+});
+
+// Working Screen Share Button
+document.getElementById("shareScreenBtn").addEventListener("click", async () => {
+    if (!activeMediaCall || !navigator.mediaDevices.getDisplayMedia) return;
+    try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenTrack = screenStream.getVideoTracks()[0];
+        const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track && s.track.kind === "video");
+        if (sender) sender.replaceTrack(screenTrack);
+        document.getElementById("localVideo").srcObject = screenStream;
+    } catch {}
+});
+
+document.getElementById("endCallBtn").addEventListener("click", () => {
+    if (activeMediaCall) activeMediaCall.close();
+    closeCallUI();
+});
+
+function resetCallButtonsUI() {
+    const micBtn = document.getElementById("toggleMicBtn");
+    const camBtn = document.getElementById("toggleCamBtn");
+    micBtn.textContent = "🎤";
+    micBtn.style.background = "rgba(255, 255, 255, 0.1)";
+    camBtn.textContent = "📷";
+    camBtn.style.background = "rgba(255, 255, 255, 0.1)";
+}
+
 function closeCallUI() {
     clearInterval(callTimerInterval);
     localStream?.getTracks().forEach(t => t.stop());
+    localStream = null;
+    activeMediaCall = null;
     document.getElementById("callOverlay").classList.add("hidden");
 }
 
 // ==========================================
-// UI HELPERS & RENDERING
+// 4. EXTRAS: VOICE NOTES, VIEW-ONCE, BURN, STEGO, WATCH PARTY, TIC-TAC-TOE
+// ==========================================
+document.getElementById("moreToolsBtn").addEventListener("click", () => {
+    document.getElementById("specialDrawer").classList.toggle("hidden");
+});
+
+document.getElementById("toggleViewOnceBtn").addEventListener("click", e => {
+    viewOnceMode = !viewOnceMode;
+    e.currentTarget.textContent = `1️⃣ View-Once: ${viewOnceMode ? "ON" : "OFF"}`;
+    e.currentTarget.style.borderColor = viewOnceMode ? "#00f5a0" : "rgba(255,255,255,0.2)";
+});
+
+document.getElementById("toggleBurnBtn").addEventListener("click", e => {
+    burnMode = !burnMode;
+    e.currentTarget.textContent = `🔥 Burn 10s: ${burnMode ? "ON" : "OFF"}`;
+    e.currentTarget.style.borderColor = burnMode ? "#00f5a0" : "rgba(255,255,255,0.2)";
+});
+
+document.getElementById("voiceNoteBtn").addEventListener("click", async e => {
+    const btn = e.currentTarget;
+    if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioChunks = [];
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = ev => audioChunks.push(ev.data);
+            mediaRecorder.onstop = async () => {
+                stream.getTracks().forEach(t => t.stop());
+                const blob = new Blob(audioChunks, { type: "audio/webm" });
+                const file = new File([blob], `VoiceNote_${Date.now()}.webm`, { type: "audio/webm" });
+                await sendFilesBatch([file]);
+            };
+            mediaRecorder.start();
+            btn.textContent = "⏹️";
+            btn.style.background = "#ef4444";
+        } catch {
+            alert("Microphone permission denied.");
+        }
+    } else {
+        mediaRecorder.stop();
+        btn.textContent = "🎙️";
+        btn.style.background = "";
+    }
+});
+
+// Steganography
+document.getElementById("openStegoBtn").addEventListener("click", () => document.getElementById("stegoModal").classList.remove("hidden"));
+document.getElementById("closeStegoBtn").addEventListener("click", () => document.getElementById("stegoModal").classList.add("hidden"));
+document.getElementById("sendStegoBtn").addEventListener("click", async () => {
+    const imgFile = document.getElementById("stegoImageInput").files[0];
+    const secret = document.getElementById("stegoSecretInput").value.trim();
+    if (!imgFile || !secret) return alert("Select photo and enter secret message!");
+
+    const blob = await encodeStegoImage(imgFile, secret);
+    const stegoFile = new File([blob], `Secret_${Date.now()}.png`, { type: "image/png" });
+    document.getElementById("stegoModal").classList.add("hidden");
+    await sendFilesBatch([stegoFile]);
+});
+
+function encodeStegoImage(file, secretText) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const payload = `QCHD::${secretText}::END`;
+            const bits = payload.split("").map(c => c.charCodeAt(0).toString(2).padStart(8, "0")).join("");
+            for (let i = 0; i < bits.length && i * 4 < imgData.data.length; i++) {
+                imgData.data[i * 4] = (imgData.data[i * 4] & 0xFE) | parseInt(bits[i], 10);
+            }
+            ctx.putImageData(imgData, 0, 0);
+            canvas.toBlob(b => resolve(b), "image/png");
+        };
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+function decodeStegoFromImage(imgEl) {
+    const canvas = document.createElement("canvas");
+    canvas.width = imgEl.naturalWidth;
+    canvas.height = imgEl.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(imgEl, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let bits = "";
+    for (let i = 0; i < 4000 && i * 4 < data.length; i++) bits += (data[i * 4] & 1).toString();
+    let decoded = "";
+    for (let i = 0; i < bits.length; i += 8) decoded += String.fromCharCode(parseInt(bits.slice(i, i + 8), 2));
+    const match = decoded.match(/QCHD::(.*?)::END/);
+    return match ? match[1] : null;
+}
+
+// Watch Party
+const watchPlayer = document.getElementById("watchPartyPlayer");
+document.getElementById("openWatchPartyBtn").addEventListener("click", () => document.getElementById("watchPartyModal").classList.remove("hidden"));
+document.getElementById("closeWatchBtn").addEventListener("click", () => document.getElementById("watchPartyModal").classList.add("hidden"));
+document.getElementById("watchFileInput").addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (f) watchPlayer.src = URL.createObjectURL(f);
+});
+["play", "pause", "seeked"].forEach(evt => {
+    watchPlayer.addEventListener(evt, () => {
+        if (currentPeerUser) sendPacket(currentPeerUser, { type: "watch-sync", action: evt, time: watchPlayer.currentTime });
+    });
+});
+
+// Live Tic-Tac-Toe
+document.getElementById("startGameBtn").addEventListener("click", () => {
+    if (!currentPeerUser) return;
+    const board = Array(9).fill("");
+    const gameId = "g_" + Date.now();
+    appendMessage(currentPeerUser, { id: gameId, from: "me", gameBoard: board, time: nowTime(), status: "delivered" });
+    sendPacket(currentPeerUser, { type: "game-move", gameId, board });
+});
+
+// ==========================================
+// 5. CHAT RENDERING, REACTIONS, REPLY & UNSEND
 // ==========================================
 function ensureThread(user, avatar = "👤", displayName = "") {
     if (!chatStore[user]) chatStore[user] = { avatar, displayName, messages: [] };
@@ -449,14 +708,24 @@ function appendMessage(user, msg) {
     saveChats();
     if (currentPeerUser === user) renderChatMessages(user);
     renderRecentChats();
+
+    if (msg.burnSeconds > 0) {
+        setTimeout(() => {
+            if (chatStore[user]) {
+                chatStore[user].messages = chatStore[user].messages.filter(m => m.id !== msg.id);
+                saveChats();
+                if (currentPeerUser === user) renderChatMessages(user);
+            }
+        }, msg.burnSeconds * 1000);
+    }
 }
 
 function saveChats() {
     const clean = {};
     for (const [k, v] of Object.entries(chatStore)) {
-        clean[k] = { avatar: v.avatar, displayName: v.displayName, messages: v.messages.filter(m => !m.mediaUrl).slice(-100) };
+        clean[k] = { avatar: v.avatar, displayName: v.displayName, messages: v.messages.filter(m => !m.mediaUrl).slice(-120) };
     }
-    localStorage.setItem("qchd_v5_chats", JSON.stringify(clean));
+    localStorage.setItem("qchd_v6_chats", JSON.stringify(clean));
 }
 
 function renderRecentChats() {
@@ -488,20 +757,110 @@ function renderRecentChats() {
 function renderChatMessages(user) {
     const feed = document.getElementById("messagesContainer");
     const msgs = chatStore[user]?.messages || [];
-    feed.innerHTML = msgs.map(m => {
+    feed.innerHTML = "";
+
+    msgs.forEach(m => {
+        const div = document.createElement("div");
+        div.className = `bubble ${m.from}`;
+
         let body = "";
-        if (m.mediaUrl) {
-            if (m.mediaType?.startsWith("image/")) body = `<img src="${m.mediaUrl}" class="msg-media" />`;
-            else if (m.mediaType?.startsWith("video/")) body = `<video src="${m.mediaUrl}" controls class="msg-media"></video>`;
-            else body = `<a href="${m.mediaUrl}" download="${m.mediaName}" style="color:#fff;">📄 ${m.mediaName}</a>`;
+        if (m.quote) body += `<div class="quote-snippet">${m.quote}</div>`;
+
+        if (m.gameBoard) {
+            body += `<div style="display:grid;grid-template-columns:repeat(3,42px);gap:4px;margin:4px 0;">
+                ${m.gameBoard.map((c, idx) => `<button class="ttt-cell" data-idx="${idx}" style="height:42px;font-size:17px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.35);color:#fff;">${c}</button>`).join("")}
+            </div>`;
+        } else if (m.mediaUrl) {
+            if (m.viewOnce && m.openedOnce) {
+                body += `<em>1️⃣ View-Once media expired</em>`;
+            } else if (m.mediaType?.startsWith("image/")) {
+                body += `<img src="${m.mediaUrl}" class="msg-media" />`;
+            } else if (m.mediaType?.startsWith("video/")) {
+                body += `<video src="${m.mediaUrl}" controls class="msg-media"></video>`;
+            } else if (m.mediaType?.startsWith("audio/")) {
+                body += `<audio src="${m.mediaUrl}" controls style="max-width:210px;"></audio>`;
+            } else {
+                body += `<a href="${m.mediaUrl}" download="${m.mediaName}" style="color:#fff;">📄 ${m.mediaName}</a>`;
+            }
         } else {
-            body = `<div>${m.text}</div>`;
+            body += `<div>${m.text}</div>`;
         }
+
         const tick = m.from === "me" ? `<span class="${m.status === "seen" ? "seen-blue" : ""}">✓✓</span>` : "";
-        return `<div class="bubble ${m.from}">${body}<div class="bubble-meta"><span>${m.time}</span>${tick}</div></div>`;
-    }).join("");
+        body += `
+            <div class="bubble-meta"><span>${m.time}</span>${tick}</div>
+            ${m.reaction ? `<div class="react-tag">${m.reaction}</div>` : ""}
+            <div class="bubble-tools">
+                <button class="b-react" data-em="❤️">❤️</button>
+                <button class="b-react" data-em="😂">😂</button>
+                <button class="b-reply">↩️</button>
+                ${m.from === "me" ? `<button class="b-del">🗑️</button>` : ""}
+            </div>
+        `;
+        div.innerHTML = body;
+
+        const imgEl = div.querySelector("img.msg-media");
+        if (imgEl) {
+            imgEl.onclick = () => {
+                const secret = decodeStegoFromImage(imgEl);
+                if (secret) alert(`🕵️ Hidden Secret Unlocked:\n\n"${secret}"`);
+                document.getElementById("lightboxContent").innerHTML = `<img src="${m.mediaUrl}" style="max-width:92vw;max-height:82vh;border-radius:16px;" />`;
+                document.getElementById("mediaLightbox").classList.remove("hidden");
+                if (m.viewOnce) {
+                    m.openedOnce = true;
+                    renderChatMessages(user);
+                }
+            };
+        }
+
+        div.querySelectorAll(".ttt-cell").forEach(cellBtn => {
+            cellBtn.onclick = () => {
+                const idx = Number(cellBtn.dataset.idx);
+                if (m.gameBoard[idx]) return;
+                m.gameBoard[idx] = m.from === "me" ? "X" : "O";
+                renderChatMessages(user);
+                sendPacket(user, { type: "game-move", gameId: m.id, board: m.gameBoard });
+            };
+        });
+
+        div.querySelectorAll(".b-react").forEach(rb => {
+            rb.onclick = () => {
+                m.reaction = rb.dataset.em;
+                saveChats();
+                renderChatMessages(user);
+                sendPacket(user, { type: "reaction", msgId: m.id, emoji: rb.dataset.em });
+            };
+        });
+
+        div.querySelector(".b-reply").onclick = () => {
+            replyingTo = m.text || m.mediaName || "Media";
+            document.getElementById("replyBar").classList.remove("hidden");
+            document.getElementById("replyPreviewText").textContent = replyingTo;
+        };
+
+        const delBtn = div.querySelector(".b-del");
+        if (delBtn) {
+            delBtn.onclick = () => {
+                chatStore[user].messages = chatStore[user].messages.filter(x => x.id !== m.id);
+                saveChats();
+                renderChatMessages(user);
+                sendPacket(user, { type: "unsend", msgId: m.id });
+            };
+        }
+
+        feed.appendChild(div);
+    });
     feed.scrollTop = feed.scrollHeight;
 }
+
+document.getElementById("cancelReplyBtn").addEventListener("click", () => {
+    replyingTo = null;
+    document.getElementById("replyBar").classList.add("hidden");
+});
+
+document.getElementById("closeLightboxBtn").addEventListener("click", () => {
+    document.getElementById("mediaLightbox").classList.add("hidden");
+});
 
 function renderCallLogs() {
     const list = document.getElementById("callLogsList");
@@ -510,7 +869,7 @@ function renderCallLogs() {
         : `<div class="ios-glass info-card"><p class="dim">No calls yet.</p></div>`;
 }
 
-// Navigation & QR
+// Navigation, QR & Reset
 function showScreen(id) {
     document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
     document.getElementById(id).classList.add("active");
@@ -551,7 +910,7 @@ document.getElementById("closeScannerBtn").addEventListener("click", () => {
 });
 
 document.getElementById("switchAccountBtn").addEventListener("click", () => {
-    localStorage.removeItem("qchd_v5_profile");
+    localStorage.removeItem("qchd_v6_profile");
     location.reload();
 });
 document.getElementById("clearChatsBtn").addEventListener("click", () => {

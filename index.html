@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#030712" />
+    <meta name="theme-color" content="#03060f" />
     <title>QuickChat HD — iOS Liquid Glass P2P</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="style.css" />
@@ -21,12 +21,10 @@
     </div>
 
     <div class="device-frame">
-        <!-- 1. FRESH ONBOARDING SCREEN (No pre-filled name) -->
+        <!-- 1. ONE-TIME ONBOARDING SCREEN -->
         <section id="setupScreen" class="screen active center-view">
             <div class="ios-glass onboarding-box">
-                <div class="app-emblem">
-                    <span>💬</span>
-                </div>
+                <div class="app-emblem"><span>💬</span></div>
                 <h1 class="hero-title">QuickChat <span>HD</span></h1>
                 <p class="hero-sub">End-to-End Encrypted • Zero Server • Liquid Glass</p>
 
@@ -57,12 +55,12 @@
                     </div>
                 </div>
 
-                <button id="startAppBtn" class="ios-primary-btn">Continue to QuickChat</button>
+                <button id="startAppBtn" class="ios-primary-btn">Save & Enter QuickChat</button>
                 <p id="setupError" class="error-msg"></p>
             </div>
         </section>
 
-        <!-- 2. MODERN WHATSAPP + iOS LIQUID GLASS HOME -->
+        <!-- 2. WHATSAPP + iOS LIQUID GLASS HOME -->
         <section id="homeScreen" class="screen">
             <header class="ios-topbar ios-glass">
                 <div class="user-chip">
@@ -107,13 +105,17 @@
 
                 <div id="tabProfile" class="tab-pane">
                     <div class="ios-glass info-card">
-                        <h3>👤 Account & Connection</h3>
+                        <h3>👤 Saved Profile & Security</h3>
                         <p class="dim">Username: <strong id="profileUserText">@user</strong></p>
                         <p class="dim">Network Status: <strong id="networkStateText">Active</strong></p>
                         <div class="btn-pair">
-                            <button id="switchAccountBtn" class="glass-sec-btn">🔄 Switch / Reset Name</button>
+                            <button id="switchAccountBtn" class="glass-sec-btn">🔄 Reset / New Name</button>
                             <button id="clearChatsBtn" class="glass-danger-btn">🗑️ Clear Chats</button>
                         </div>
+                    </div>
+                    <div class="ios-glass info-card" style="margin-top:12px;">
+                        <h3>📱 Install Android .APK</h3>
+                        <p class="dim">Chrome menu se <b>"Install App / Add to Home Screen"</b> dabayein, ya GitHub Pages URL ko <b>PWABuilder.com</b> par daal kar direct <code>QuickChat-HD.apk</code> download karein.</p>
                     </div>
                 </div>
             </main>
@@ -149,7 +151,7 @@
                 <div class="top-actions">
                     <button id="audioCallBtn" class="glass-circle-btn" title="Voice Call">📞</button>
                     <button id="videoCallBtn" class="glass-circle-btn" title="Video Call">📹</button>
-                    <button id="moreToolsBtn" class="glass-circle-btn" title="Extras">✨</button>
+                    <button id="moreToolsBtn" class="glass-circle-btn" title="Special Features">✨</button>
                 </div>
             </header>
 
@@ -174,13 +176,14 @@
                 <button type="button" class="chip-act" id="toggleBurnBtn">🔥 Burn 10s: OFF</button>
                 <button type="button" class="chip-act" id="openStegoBtn">🕵️ Secret Photo</button>
                 <button type="button" class="chip-act" id="openWatchPartyBtn">🎬 Watch Party</button>
+                <button type="button" class="chip-act" id="startGameBtn">🎮 Tic-Tac-Toe</button>
             </div>
 
             <!-- Reply Bar -->
             <div id="replyBar" class="reply-strip hidden">
                 <div>
-                    <small>Replying to</small>
-                    <p id="replyPreviewText"></p>
+                    <small style="color:#00f5a0;">Replying to</small>
+                    <p id="replyPreviewText" style="font-size:12.5px;"></p>
                 </div>
                 <button id="cancelReplyBtn" class="glass-circle-btn">✕</button>
             </div>
@@ -212,9 +215,10 @@
             </div>
 
             <div id="activeCallControls" class="call-dock ios-glass">
-                <button id="toggleMicBtn" class="glass-circle-btn">🎤</button>
-                <button id="toggleCamBtn" class="glass-circle-btn">📷</button>
-                <button id="endCallBtn" class="btn-call-no">End Call</button>
+                <button id="toggleMicBtn" class="glass-circle-btn" title="Mute / Unmute">🎤</button>
+                <button id="toggleCamBtn" class="glass-circle-btn" title="Camera On / Off">📷</button>
+                <button id="shareScreenBtn" class="glass-circle-btn" title="Share Screen">🖥️</button>
+                <button id="endCallBtn" class="btn-call-no">End</button>
             </div>
         </div>
 
@@ -241,12 +245,13 @@
         <div id="stegoModal" class="modal-mask hidden">
             <div class="ios-glass modal-card">
                 <h3>🕵️ Hide Secret in Photo</h3>
+                <p class="dim">Photo ke pixels ke andar secret text chhupayein</p>
                 <input type="file" id="stegoImageInput" accept="image/*" style="margin:10px 0;width:100%;" />
                 <div class="ios-input-wrap" style="margin-bottom:12px;">
                     <input type="text" id="stegoSecretInput" placeholder="Enter secret message..." />
                 </div>
                 <div class="btn-pair">
-                    <button id="sendStegoBtn" class="ios-primary-btn">Send</button>
+                    <button id="sendStegoBtn" class="ios-primary-btn" style="margin-top:0;">Send</button>
                     <button id="closeStegoBtn" class="glass-sec-btn">Cancel</button>
                 </div>
             </div>
@@ -259,6 +264,14 @@
                 <input type="file" id="watchFileInput" accept="video/*,audio/*" style="margin:10px 0;width:100%;" />
                 <video id="watchPartyPlayer" controls style="width:100%;border-radius:14px;max-height:200px;background:#000;"></video>
                 <button id="closeWatchBtn" class="glass-sec-btn" style="width:100%;margin-top:10px;">Close</button>
+            </div>
+        </div>
+
+        <!-- 9. FULLSCREEN MEDIA LIGHTBOX -->
+        <div id="mediaLightbox" class="modal-mask hidden">
+            <div style="position:relative;max-width:95vw;max-height:90vh;">
+                <button id="closeLightboxBtn" class="glass-circle-btn" style="position:absolute;top:-14px;right:-14px;background:#ef4444;">✕</button>
+                <div id="lightboxContent"></div>
             </div>
         </div>
     </div>

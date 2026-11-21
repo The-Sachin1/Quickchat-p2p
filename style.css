@@ -28,7 +28,6 @@ body {
     overflow: hidden;
 }
 
-/* iPhone Liquid Glass Fluid Mesh */
 .liquid-scene {
     position: fixed;
     inset: 0;
@@ -100,7 +99,6 @@ body {
     border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* True Multi-Layered iOS Liquid Glass Surface */
 .ios-glass {
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.14) 0%, var(--glass-fill) 50%, rgba(10, 15, 28, 0.65) 100%);
     backdrop-filter: blur(22px) saturate(190%);
@@ -121,7 +119,6 @@ body {
 .screen.active { display: flex; }
 .center-view { justify-content: center; align-items: center; padding: 20px; }
 
-/* Onboarding */
 .onboarding-box {
     width: 100%;
     border-radius: 32px;
@@ -211,7 +208,6 @@ body {
 .ios-primary-btn:active { transform: scale(0.96); }
 .error-msg { color: #fca5a5; font-size: 12.5px; margin-top: 10px; min-height: 18px; }
 
-/* Home Topbar & Capsule Search */
 .ios-topbar {
     margin: 10px 12px 0;
     padding: 10px 14px;
@@ -249,6 +245,7 @@ body {
     cursor: pointer;
     display: grid;
     place-items: center;
+    transition: background 0.15s, transform 0.12s;
 }
 .glass-circle-btn:active { transform: scale(0.92); }
 
@@ -339,7 +336,6 @@ body {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
-/* Chat View */
 .peer-sub { font-size: 11.5px; color: var(--mint); }
 .encryption-bar {
     text-align: center;
@@ -379,15 +375,49 @@ body {
     backdrop-filter: blur(14px);
     border-bottom-left-radius: 6px;
 }
+
+.quote-snippet {
+    background: rgba(0, 0, 0, 0.28);
+    border-left: 3px solid var(--mint);
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    margin-bottom: 5px;
+}
+
 .bubble-meta {
     display: flex;
     justify-content: flex-end;
     gap: 4px;
     font-size: 10px;
-    opacity: 0.8;
+    opacity: 0.82;
     margin-top: 4px;
 }
 .seen-blue { color: #38bdf8; font-weight: 900; }
+
+.bubble-tools {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+}
+.bubble-tools button {
+    background: rgba(255, 255, 255, 0.14);
+    border: none;
+    border-radius: 8px;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: #fff;
+    cursor: pointer;
+}
+
+.react-tag {
+    display: inline-block;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 99px;
+    padding: 1px 7px;
+    font-size: 12px;
+    margin-top: 4px;
+}
 
 .composer-bar {
     margin: 6px 12px 12px;
@@ -451,14 +481,13 @@ body {
     align-items: center;
 }
 
-/* Call & Modals */
 .call-screen { position: fixed; inset: 0; z-index: 50; background: #02050c; }
 #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
 #localVideo { position: absolute; bottom: 110px; right: 16px; width: 110px; height: 155px; border-radius: 18px; object-fit: cover; border: 2px solid #fff; }
 .call-header { position: absolute; top: 24px; left: 20px; right: 20px; padding: 14px; border-radius: 24px; text-align: center; }
 .call-dock { position: absolute; bottom: 26px; left: 24px; right: 24px; padding: 12px; border-radius: 99px; display: flex; justify-content: center; gap: 14px; }
-.btn-call-yes { background: #10b981; color: #fff; border: none; padding: 12px 24px; border-radius: 99px; font-weight: 700; }
-.btn-call-no { background: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 99px; font-weight: 700; }
+.btn-call-yes { background: #10b981; color: #fff; border: none; padding: 12px 24px; border-radius: 99px; font-weight: 700; cursor: pointer; }
+.btn-call-no { background: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 99px; font-weight: 700; cursor: pointer; }
 
 .modal-mask { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.76); display: grid; place-items: center; padding: 20px; }
 .modal-card { width: 100%; max-width: 360px; padding: 22px; border-radius: 28px; text-align: center; }
@@ -468,5 +497,5 @@ body {
 .btn-pair { display: flex; gap: 8px; margin-top: 12px; }
 .glass-sec-btn { flex: 1; padding: 11px; border-radius: 14px; border: 1px solid var(--glass-edge); background: rgba(255,255,255,0.1); color: #fff; font-weight: 700; cursor: pointer; }
 .glass-danger-btn { flex: 1; padding: 11px; border-radius: 14px; border: 1px solid rgba(239,68,68,0.4); background: rgba(239,68,68,0.2); color: #fca5a5; font-weight: 700; cursor: pointer; }
-.msg-media { max-width: 100%; max-height: 220px; border-radius: 14px; margin-top: 4px; display: block; }
+.msg-media { max-width: 100%; max-height: 220px; border-radius: 14px; margin-top: 4px; display: block; cursor: pointer; }
 .hidden { display: none !important; }

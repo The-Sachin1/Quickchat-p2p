@@ -1,10 +1,10 @@
 {
-  "name": "QuickChat HD — E2EE Liquid Glass Messenger",
+  "name": "QuickChat HD — iOS Liquid Glass P2P",
   "short_name": "QuickChat HD",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#050912",
-  "theme_color": "#00e699",
+  "background_color": "#03060f",
+  "theme_color": "#00f5a0",
   "orientation": "portrait",
   "icons": [
     {
