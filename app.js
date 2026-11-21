@@ -1,5 +1,5 @@
-// QuickChat HD v7.0 — Universal Mobile + Desktop Video Fix + Auto-Cache Buster + E2EE
-const PEER_PREFIX = "qchd-live-v7-";
+// QuickChat HD v8.0 — Guaranteed Zero-Black-Screen Video Engine + E2EE + Liquid Glass
+const PEER_PREFIX = "qchd-live-v8-";
 const CHUNK_SIZE = 65536;
 
 let peer = null;
@@ -7,6 +7,7 @@ let connections = {};
 let outboxQueues = {};
 let activeMediaCall = null;
 let localStream = null;
+let isCamOn = true;
 
 let myProfile = JSON.parse(localStorage.getItem("qchd_v6_profile") || "null");
 let chatStore = JSON.parse(localStorage.getItem("qchd_v6_chats") || "{}");
@@ -23,7 +24,6 @@ let audioChunks = [];
 let callTimerInterval = null;
 let html5QrScanner = null;
 
-// Interactive iOS Specular Sheen
 const sheen = document.getElementById("glassSheen");
 window.addEventListener("pointermove", e => {
     if (sheen) {
@@ -33,11 +33,8 @@ window.addEventListener("pointermove", e => {
 }, { passive: true });
 
 window.addEventListener("DOMContentLoaded", () => {
-    // Force clear any old cached Service Worker so phone loads latest code immediately
     if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-            regs.forEach(r => r.unregister());
-        }).catch(() => {});
+        navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister())).catch(() => {});
     }
 
     document.querySelectorAll(".av-btn").forEach(btn => {
@@ -237,12 +234,6 @@ async function onReceiveData(sender, data) {
         return;
     }
 
-    if (data.type === "cam-state") {
-        const remoteVid = document.getElementById("remoteVideo");
-        if (remoteVid) remoteVid.style.opacity = data.enabled ? "1" : "0.15";
-        return;
-    }
-
     if (data.type === "typing") {
         if (currentPeerUser === sender) {
             document.getElementById("peerPresence").textContent = data.isTyping ? "typing..." : "● Online • E2EE Connected";
@@ -359,7 +350,7 @@ async function onReceiveData(sender, data) {
 }
 
 // ==========================================
-// 2. SEND TEXT, TYPING INDICATOR & BATCH MEDIA
+// 2. SEND TEXT & BATCH MEDIA
 // ==========================================
 const msgInput = document.getElementById("messageInput");
 let typingTimer = null;
@@ -462,42 +453,47 @@ async function sendFilesBatch(files) {
 }
 
 // ==========================================
-// 3. UNIVERSAL MOBILE + DESKTOP HD CALLS & CAMERA FIX
+// 3. CANVAS-FALLBACK VIDEO ENGINE (NEVER BLACK SCREENS!)
 // ==========================================
+function createAvatarStream() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 480;
+    canvas.height = 640;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#0b1324";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#00f5a0";
+    ctx.font = "bold 36px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("📷 Camera Paused", canvas.width / 2, canvas.height / 2);
+    return canvas.captureStream(15);
+}
+
+async function attachStreamToVideo(videoId, stream, isMuted) {
+    const oldVid = document.getElementById(videoId);
+    const freshVid = oldVid.cloneNode(false);
+    freshVid.muted = isMuted;
+    freshVid.autoplay = true;
+    freshVid.playsInline = true;
+    freshVid.srcObject = stream;
+    oldVid.parentNode.replaceChild(freshVid, oldVid);
+    await freshVid.play().catch(() => {});
+    return freshVid;
+}
+
 document.getElementById("videoCallBtn").addEventListener("click", () => startCall(true));
 document.getElementById("audioCallBtn").addEventListener("click", () => startCall(false));
-
-async function getSafeMediaStream(wantVideo) {
-    try {
-        return await navigator.mediaDevices.getUserMedia({
-            video: wantVideo ? { facingMode: "user" } : false,
-            audio: true
-        });
-    } catch {
-        // Fallback if facingMode fails on some laptops/phones
-        return await navigator.mediaDevices.getUserMedia({
-            video: wantVideo,
-            audio: true
-        });
-    }
-}
 
 async function startCall(video) {
     if (!currentPeerUser) return;
     closeCallUI();
-    await new Promise(r => setTimeout(r, 250));
 
     try {
-        localStream = await getSafeMediaStream(video);
+        localStream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+        isCamOn = video;
+        await attachStreamToVideo("localVideo", localStream, true);
 
-        const localVid = document.getElementById("localVideo");
-        localVid.muted = true;
-        localVid.playsInline = true;
-        localVid.style.opacity = "1";
-        localVid.srcObject = localStream;
-        await localVid.play().catch(() => {});
-
-        resetCallButtonsUI();
+        resetCallButtonsUI(video);
         document.getElementById("callPeerName").textContent = `@${currentPeerUser}`;
         document.getElementById("callTimerText").textContent = "Calling...";
         document.getElementById("incomingCallControls").classList.add("hidden");
@@ -509,7 +505,7 @@ async function startCall(video) {
         });
         wireCall(call, video ? "Video Call" : "Audio Call");
     } catch (err) {
-        alert("Camera/Mic access error: " + err.message);
+        alert("Camera/Mic error: " + err.message);
     }
 }
 
@@ -517,7 +513,7 @@ function handleIncomingCall(call) {
     const caller = call.metadata?.caller || call.peer.replace(PEER_PREFIX, "");
     const video = call.metadata?.video ?? true;
 
-    resetCallButtonsUI();
+    resetCallButtonsUI(video);
     document.getElementById("callPeerName").textContent = `@${caller}`;
     document.getElementById("callTimerText").textContent = video ? "Incoming HD Video Call..." : "Incoming Voice Call...";
     document.getElementById("incomingCallControls").classList.remove("hidden");
@@ -525,20 +521,9 @@ function handleIncomingCall(call) {
     document.getElementById("callOverlay").classList.remove("hidden");
 
     document.getElementById("acceptCallBtn").onclick = async () => {
-        if (localStream) {
-            localStream.getTracks().forEach(t => t.stop());
-            localStream = null;
-        }
-        await new Promise(r => setTimeout(r, 250));
-
-        localStream = await getSafeMediaStream(video);
-
-        const localVid = document.getElementById("localVideo");
-        localVid.muted = true;
-        localVid.playsInline = true;
-        localVid.style.opacity = "1";
-        localVid.srcObject = localStream;
-        await localVid.play().catch(() => {});
+        localStream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+        isCamOn = video;
+        await attachStreamToVideo("localVideo", localStream, true);
 
         call.answer(localStream);
         document.getElementById("incomingCallControls").classList.add("hidden");
@@ -557,12 +542,7 @@ function wireCall(call, type) {
     let sec = 0;
 
     call.on("stream", async remote => {
-        const remoteVid = document.getElementById("remoteVideo");
-        remoteVid.playsInline = true;
-        remoteVid.style.opacity = "1";
-        remoteVid.srcObject = remote;
-        await remoteVid.play().catch(() => {});
-
+        await attachStreamToVideo("remoteVideo", remote, false);
         clearInterval(callTimerInterval);
         callTimerInterval = setInterval(() => {
             sec++;
@@ -588,33 +568,50 @@ document.getElementById("toggleMicBtn").addEventListener("click", e => {
     e.currentTarget.style.background = track.enabled ? "rgba(255, 255, 255, 0.1)" : "#ef4444";
 });
 
-// Working Camera Toggle Button (Toggle track.enabled without killing WebRTC stream)
+// Zero-Black-Screen Camera Toggle (Swaps between live camera and smooth avatar canvas stream)
 document.getElementById("toggleCamBtn").addEventListener("click", async e => {
     const btn = e.currentTarget;
     if (!localStream) return;
 
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (!videoTrack) {
-        alert("This is an Audio Call.");
-        return;
-    }
+    if (isCamOn) {
+        // Turn Camera OFF cleanly using Avatar Canvas Track
+        localStream.getVideoTracks().forEach(t => t.stop());
+        const pausedStream = createAvatarStream();
+        const pausedTrack = pausedStream.getVideoTracks()[0];
 
-    videoTrack.enabled = !videoTrack.enabled;
-    const localVid = document.getElementById("localVideo");
+        const audioTracks = localStream.getAudioTracks();
+        localStream = new MediaStream([...audioTracks, pausedTrack]);
+        await attachStreamToVideo("localVideo", localStream, true);
 
-    if (videoTrack.enabled) {
-        localVid.style.opacity = "1";
-        await localVid.play().catch(() => {});
-        btn.textContent = "📷";
-        btn.style.background = "rgba(255, 255, 255, 0.1)";
-    } else {
-        localVid.style.opacity = "0.15";
+        if (activeMediaCall?.peerConnection) {
+            const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track?.kind === "video");
+            if (sender) await sender.replaceTrack(pausedTrack);
+        }
+
+        isCamOn = false;
         btn.textContent = "🚫";
         btn.style.background = "#ef4444";
-    }
+    } else {
+        // Turn Camera ON with fresh hardware stream + cloned video element
+        try {
+            const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const liveTrack = camStream.getVideoTracks()[0];
 
-    if (currentPeerUser) {
-        sendPacket(currentPeerUser, { type: "cam-state", enabled: videoTrack.enabled });
+            const audioTracks = localStream.getAudioTracks();
+            localStream = new MediaStream([...audioTracks, liveTrack]);
+            await attachStreamToVideo("localVideo", localStream, true);
+
+            if (activeMediaCall?.peerConnection) {
+                const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track?.kind === "video");
+                if (sender) await sender.replaceTrack(liveTrack);
+            }
+
+            isCamOn = true;
+            btn.textContent = "📷";
+            btn.style.background = "rgba(255, 255, 255, 0.1)";
+        } catch (err) {
+            alert("Camera could not turn on: " + err.message);
+        }
     }
 });
 
@@ -624,12 +621,9 @@ document.getElementById("shareScreenBtn").addEventListener("click", async () => 
     try {
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         const screenTrack = screenStream.getVideoTracks()[0];
-        const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track && s.track.kind === "video");
+        const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track?.kind === "video");
         if (sender) await sender.replaceTrack(screenTrack);
-        const localVid = document.getElementById("localVideo");
-        localVid.style.opacity = "1";
-        localVid.srcObject = screenStream;
-        await localVid.play().catch(() => {});
+        await attachStreamToVideo("localVideo", screenStream, true);
     } catch {}
 });
 
@@ -638,30 +632,25 @@ document.getElementById("endCallBtn").addEventListener("click", () => {
     closeCallUI();
 });
 
-function resetCallButtonsUI() {
+function resetCallButtonsUI(video) {
     const micBtn = document.getElementById("toggleMicBtn");
     const camBtn = document.getElementById("toggleCamBtn");
     micBtn.textContent = "🎤";
     micBtn.style.background = "rgba(255, 255, 255, 0.1)";
-    camBtn.textContent = "📷";
-    camBtn.style.background = "rgba(255, 255, 255, 0.1)";
+    camBtn.textContent = video ? "📷" : "🚫";
+    camBtn.style.background = video ? "rgba(255, 255, 255, 0.1)" : "#ef4444";
 }
 
 function closeCallUI() {
     clearInterval(callTimerInterval);
     if (localStream) {
-        localStream.getTracks().forEach(t => {
-            t.enabled = false;
-            t.stop();
-        });
+        localStream.getTracks().forEach(t => t.stop());
         localStream = null;
     }
     const localVid = document.getElementById("localVideo");
     const remoteVid = document.getElementById("remoteVideo");
-    localVid.pause();
-    localVid.srcObject = null;
-    remoteVid.pause();
-    remoteVid.srcObject = null;
+    if (localVid) localVid.srcObject = null;
+    if (remoteVid) remoteVid.srcObject = null;
 
     activeMediaCall = null;
     document.getElementById("callOverlay").classList.add("hidden");
@@ -713,7 +702,6 @@ document.getElementById("voiceNoteBtn").addEventListener("click", async e => {
     }
 });
 
-// Steganography
 document.getElementById("openStegoBtn").addEventListener("click", () => document.getElementById("stegoModal").classList.remove("hidden"));
 document.getElementById("closeStegoBtn").addEventListener("click", () => document.getElementById("stegoModal").classList.add("hidden"));
 document.getElementById("sendStegoBtn").addEventListener("click", async () => {
@@ -764,7 +752,6 @@ function decodeStegoFromImage(imgEl) {
     return match ? match[1] : null;
 }
 
-// Watch Party
 const watchPlayer = document.getElementById("watchPartyPlayer");
 document.getElementById("openWatchPartyBtn").addEventListener("click", () => document.getElementById("watchPartyModal").classList.remove("hidden"));
 document.getElementById("closeWatchBtn").addEventListener("click", () => document.getElementById("watchPartyModal").classList.add("hidden"));
@@ -778,7 +765,6 @@ document.getElementById("watchFileInput").addEventListener("change", e => {
     });
 });
 
-// Live Tic-Tac-Toe
 document.getElementById("startGameBtn").addEventListener("click", () => {
     if (!currentPeerUser) return;
     const board = Array(9).fill("");
@@ -965,7 +951,6 @@ function renderCallLogs() {
         : `<div class="ios-glass info-card"><p class="dim">No calls yet.</p></div>`;
 }
 
-// Navigation, QR & Reset
 function showScreen(id) {
     document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
     document.getElementById(id).classList.add("active");
