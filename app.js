@@ -1,5 +1,5 @@
-// QuickChat HD v3.3 — Instant Unlock + Fail-Safe Signaling + Liquid Glass E2EE
-const PEER_PREFIX = "quickchat-hd-v3-";
+// QuickChat HD v4.0 — Permanent Auto-Login + iPhone Liquid Glass E2EE Messenger
+const PEER_PREFIX = "quickchat-hd-v4-";
 const CHUNK_SIZE = 65536;
 const HIGH_WATER_MARK = 1048576;
 
@@ -7,7 +7,7 @@ let peer = null;
 let activeConn = null;
 let activeMediaCall = null;
 let localStream = null;
-let myProfile = JSON.parse(localStorage.getItem("qchd_profile") || "null");
+let myProfile = null;
 let chatStore = JSON.parse(localStorage.getItem("qchd_chats") || "{}");
 let callLogs = JSON.parse(localStorage.getItem("qchd_calls") || "[]");
 let currentPeerUser = null;
@@ -33,12 +33,55 @@ const displayNameInput = document.getElementById("displayNameInput");
 const startAppBtn = document.getElementById("startAppBtn");
 const setupStatus = document.getElementById("setupStatus");
 
-window.addEventListener("DOMContentLoaded", () => {
-    // Unregister any stuck old service worker cache
+// Interactive iPhone Liquid Glass Specular Light Sheen
+const sheen = document.getElementById("specularSheen");
+if (sheen) {
+    window.addEventListener("pointermove", e => {
+        sheen.style.left = `${e.clientX}px`;
+        sheen.style.top = `${e.clientY}px`;
+    }, { passive: true });
+}
+
+// ==========================================
+// PERMANENT PROFILE STORAGE (LocalStorage + IndexedDB Backup)
+// ==========================================
+function loadSavedProfile() {
+    return new Promise(resolve => {
+        const local = JSON.parse(localStorage.getItem("qchd_profile") || "null");
+        if (local && local.username) return resolve(local);
+
+        const req = indexedDB.open("QuickChatProfileDB", 1);
+        req.onupgradeneeded = () => req.result.createObjectStore("profile");
+        req.onsuccess = () => {
+            const tx = req.result.transaction("profile", "readonly");
+            const getReq = tx.objectStore("profile").get("me");
+            getReq.onsuccess = () => {
+                if (getReq.result && getReq.result.username) {
+                    localStorage.setItem("qchd_profile", JSON.stringify(getReq.result));
+                    resolve(getReq.result);
+                } else {
+                    resolve(null);
+                }
+            };
+            getReq.onerror = () => resolve(null);
+        };
+        req.onerror = () => resolve(null);
+    });
+}
+
+function savePermanentProfile(profile) {
+    localStorage.setItem("qchd_profile", JSON.stringify(profile));
+    const req = indexedDB.open("QuickChatProfileDB", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("profile");
+    req.onsuccess = () => {
+        const tx = req.result.transaction("profile", "readwrite");
+        tx.objectStore("profile").put(profile, "me");
+    };
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
     if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-            regs.forEach(r => r.update());
-        }).catch(() => {});
+        navigator.serviceWorker.register("sw.js").catch(() => {});
     }
 
     document.querySelectorAll(".avatar-opt").forEach(btn => {
@@ -48,10 +91,14 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // Auto-Login Check: If user already registered once, skip login screen forever!
+    myProfile = await loadSavedProfile();
     if (myProfile && myProfile.username) {
         usernameInput.value = myProfile.username;
         displayNameInput.value = myProfile.displayName || "";
         initPeerNetwork(myProfile);
+    } else {
+        switchScreen(setupScreen);
     }
 });
 
@@ -70,12 +117,12 @@ startAppBtn.addEventListener("click", () => {
     }
 
     myProfile = { username: rawUser, displayName, avatar };
-    localStorage.setItem("qchd_profile", JSON.stringify(myProfile));
+    savePermanentProfile(myProfile);
     initPeerNetwork(myProfile);
 });
 
 async function initPeerNetwork(profile) {
-    // 1. INSTANTLY OPEN HOME SCREEN (0ms wait!)
+    // 1. Instantly unlock Home Screen without waiting
     document.getElementById("myAvatarBadge").textContent = profile.avatar;
     document.getElementById("myDisplayHeader").textContent = profile.displayName;
     document.getElementById("myStatusLine").textContent = `● @${profile.username} • Connecting...`;
@@ -84,52 +131,54 @@ async function initPeerNetwork(profile) {
     renderRecentChats();
     renderCallLogs();
 
-    // 2. Generate ECDH Keys safely
+    // 2. Generate ECDH Keys
     if (window.crypto && window.crypto.subtle) {
         try {
             await generateECDHKeys();
-        } catch (e) {
-            console.warn("WebCrypto fallback active");
-        }
+        } catch {}
     }
 
-    // 3. Connect PeerJS in background
-    if (typeof Peer === "undefined") {
-        document.getElementById("myStatusLine").textContent = `⚠️ PeerJS CDN blocked/offline`;
-        return;
-    }
+    // 3. Connect PeerJS with automatic fallback ID if old tab is still closing
+    connectToSignaling(profile.username, 0);
+}
 
+function connectToSignaling(baseUsername, retryCount) {
+    if (typeof Peer === "undefined") return;
     if (peer) peer.destroy();
-    peer = new Peer(PEER_PREFIX + profile.username, {
+
+    const peerId = retryCount === 0
+        ? PEER_PREFIX + baseUsername
+        : `${PEER_PREFIX}${baseUsername}_${retryCount}`;
+
+    peer = new Peer(peerId, {
         debug: 0,
         config: {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:global.stun.twilio.com:3478" }
+                { urls: "stun:stun1.l.google.com:19302" }
             ]
         }
     });
 
     peer.on("open", () => {
-        document.getElementById("myStatusLine").textContent = `● @${profile.username} • Online`;
+        document.getElementById("myStatusLine").textContent = `● @${myProfile.username} • Online`;
         document.getElementById("myStatusLine").classList.add("online");
         flushOfflineOutbox();
     });
 
     peer.on("disconnected", () => {
-        document.getElementById("myStatusLine").textContent = `● @${profile.username} • Reconnecting...`;
+        document.getElementById("myStatusLine").textContent = `● @${myProfile.username} • Reconnecting...`;
         peer.reconnect();
     });
 
     peer.on("error", err => {
-        if (err.type === "unavailable-id") {
-            alert(`⚠️ @${profile.username} pehle se active hai. Koi aur username dalein!`);
-            switchScreen(setupScreen);
+        if (err.type === "unavailable-id" && retryCount < 2) {
+            // Reclaim session seamlessly without logging user out!
+            setTimeout(() => connectToSignaling(baseUsername, retryCount + 1), 600);
         } else if (err.type === "peer-unavailable") {
             document.getElementById("peerPresence").textContent = "Offline (Messages queued in Outbox)";
         } else {
-            document.getElementById("myStatusLine").textContent = `● @${profile.username} • Local Ready`;
+            document.getElementById("myStatusLine").textContent = `● @${myProfile.username} • Ready`;
         }
     });
 
@@ -252,7 +301,7 @@ function openChatWithUser(targetUser) {
 
 function setupDataConnection(conn) {
     activeConn = conn;
-    const remoteUser = conn.peer.replace(PEER_PREFIX, "");
+    const remoteUser = conn.peer.replace(PEER_PREFIX, "").replace(/_\d+$/, "");
 
     conn.on("open", async () => {
         if (!currentPeerUser) {
@@ -608,7 +657,7 @@ async function startMediaCall(withVideo) {
 }
 
 function handleIncomingMediaCall(incomingCall) {
-    const caller = incomingCall.metadata?.caller || incomingCall.peer.replace(PEER_PREFIX, "");
+    const caller = incomingCall.metadata?.caller || incomingCall.peer.replace(PEER_PREFIX, "").replace(/_\d+$/, "");
     const withVideo = incomingCall.metadata?.withVideo ?? true;
 
     document.getElementById("callPeerName").textContent = `@${caller}`;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#050912" />
-    <title>QuickChat HD — Liquid Glass E2EE Messenger</title>
+    <title>QuickChat HD — iOS Liquid Glass E2EE Messenger</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="style.css" />
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -12,22 +12,24 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
-    <!-- Lightweight GPU-Accelerated Liquid Mesh Background -->
+    <!-- iOS 26 / VisionOS GPU Liquid Mesh & Specular Refraction -->
     <div class="liquid-bg" aria-hidden="true">
         <div class="liquid-blob blob-1"></div>
         <div class="liquid-blob blob-2"></div>
+        <div class="liquid-blob blob-3"></div>
+        <div id="specularSheen" class="specular-sheen"></div>
     </div>
 
     <div id="app" class="app-shell">
-        <!-- 1. CUSTOM USER ONBOARDING SCREEN -->
-        <section id="setupScreen" class="screen active center-screen">
+        <!-- 1. ONE-TIME PROFILE SETUP (Hidden automatically on repeat visits) -->
+        <section id="setupScreen" class="screen center-screen">
             <div class="glass-card setup-card liquid-pop">
                 <div class="brand-orb">💬</div>
                 <h1>QuickChat <span class="accent">HD</span></h1>
-                <p class="subtitle">Liquid Glass • ECDH AES-256 E2EE • P2P</p>
+                <p class="subtitle">iOS Liquid Glass • ECDH AES-256 E2EE • P2P</p>
 
                 <div class="input-group">
-                    <label for="usernameInput">Apna Unique Username Banayein</label>
+                    <label for="usernameInput">Apna Permanent Username Banayein</label>
                     <div class="prefix-input">
                         <span>@</span>
                         <input type="text" id="usernameInput" placeholder="apna_username_likhein" autocomplete="off" />
@@ -51,7 +53,7 @@
                     </div>
                 </div>
 
-                <button id="startAppBtn" class="btn-primary liquid-btn">Start QuickChat HD →</button>
+                <button id="startAppBtn" class="btn-primary liquid-btn">Save & Enter QuickChat →</button>
                 <p id="setupStatus" class="status-hint"></p>
             </div>
         </section>
@@ -100,8 +102,9 @@
 
                 <div id="tabVault" class="tab-view">
                     <div class="glass-panel vault-card">
-                        <h3>🛡️ Security & Profile Controls</h3>
-                        <p class="muted">Active ID: <strong id="vaultUsernameDisplay">@user</strong></p>
+                        <h3>🛡️ Saved Profile & Auto-Login</h3>
+                        <p class="muted">Permanent ID: <strong id="vaultUsernameDisplay">@user</strong></p>
+                        <p class="muted">Auto-Login Status: <strong style="color:#00e699;">Active (Saved on Device)</strong></p>
                         <p class="muted">Offline Outbox Queue: <strong id="queueCountDisplay">0 files pending</strong></p>
                         <div class="vault-actions">
                             <button id="changeUserBtn" class="btn-secondary">✏️ Edit Profile / Username</button>
