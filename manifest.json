@@ -1,0 +1,16 @@
+{
+  "name": "QuickChat HD — iOS Liquid Glass P2P",
+  "short_name": "QuickChat HD",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#03060f",
+  "theme_color": "#00f5a0",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/134/134914.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
