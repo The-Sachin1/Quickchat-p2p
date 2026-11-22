@@ -1,5 +1,5 @@
-// QuickChat HD v8.0 — Guaranteed Zero-Black-Screen Video Engine + E2EE + Liquid Glass
-const PEER_PREFIX = "qchd-live-v8-";
+// QuickChat HD v10.0 — TURN Relay + Direct Video Binding + Zero-Break Camera Toggle
+const PEER_PREFIX = "qchd-live-v10-";
 const CHUNK_SIZE = 65536;
 
 let peer = null;
@@ -100,16 +100,30 @@ function initPeer(username) {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:19302" },
-                { urls: "stun:global.stun.twilio.com:3478" }
-            ]
+                {
+                    urls: "turn:openrelay.metered.ca:80",
+                    username: "openrelayproject",
+                    credential: "openrelayproject"
+                },
+                {
+                    urls: "turn:openrelay.metered.ca:443",
+                    username: "openrelayproject",
+                    credential: "openrelayproject"
+                },
+                {
+                    urls: "turn:openrelay.metered.ca:443?transport=tcp",
+                    username: "openrelayproject",
+                    credential: "openrelayproject"
+                }
+            ],
+            iceCandidatePoolSize: 10
         }
     });
 
     peer.on("open", () => {
         document.getElementById("statusDot").classList.add("online");
         document.getElementById("myStatusLine").textContent = `@${username} • Online`;
-        document.getElementById("networkStateText").textContent = "Connected (P2P Ready)";
+        document.getElementById("networkStateText").textContent = "Connected (STUN + TURN Relay Ready)";
     });
 
     peer.on("disconnected", () => {
@@ -231,6 +245,15 @@ async function onReceiveData(sender, data) {
             document.getElementById("safetyCodeText").textContent = `${hash[0]}${hash[1]}${hash[2]}`.slice(0, 6);
         }
         renderRecentChats();
+        return;
+    }
+
+    if (data.type === "cam-state") {
+        const remoteVid = document.getElementById("remoteVideo");
+        if (remoteVid) {
+            remoteVid.style.opacity = data.enabled ? "1" : "0.15";
+            if (data.enabled) remoteVid.play().catch(() => {});
+        }
         return;
     }
 
@@ -453,32 +476,32 @@ async function sendFilesBatch(files) {
 }
 
 // ==========================================
-// 3. CANVAS-FALLBACK VIDEO ENGINE (NEVER BLACK SCREENS!)
+// 3. DIRECT VIDEO ENGINE (NO CLONING + NON-DESTRUCTIVE TRACK TOGGLE)
 // ==========================================
-function createAvatarStream() {
-    const canvas = document.createElement("canvas");
-    canvas.width = 480;
-    canvas.height = 640;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#0b1324";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#00f5a0";
-    ctx.font = "bold 36px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("📷 Camera Paused", canvas.width / 2, canvas.height / 2);
-    return canvas.captureStream(15);
+async function bindVideoElement(videoId, stream, isMuted) {
+    const vid = document.getElementById(videoId);
+    if (!vid) return;
+    vid.muted = isMuted;
+    vid.autoplay = true;
+    vid.setAttribute("playsinline", "true");
+    vid.style.opacity = "1";
+    vid.srcObject = stream;
+    try {
+        await vid.play();
+    } catch (e) {
+        console.warn("Video play retry:", e);
+    }
 }
 
-async function attachStreamToVideo(videoId, stream, isMuted) {
-    const oldVid = document.getElementById(videoId);
-    const freshVid = oldVid.cloneNode(false);
-    freshVid.muted = isMuted;
-    freshVid.autoplay = true;
-    freshVid.playsInline = true;
-    freshVid.srcObject = stream;
-    oldVid.parentNode.replaceChild(freshVid, oldVid);
-    await freshVid.play().catch(() => {});
-    return freshVid;
+async function getCameraAndMic(wantVideo) {
+    const constraints = wantVideo
+        ? { video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: true }
+        : { video: false, audio: true };
+    try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch {
+        return await navigator.mediaDevices.getUserMedia({ video: wantVideo, audio: true });
+    }
 }
 
 document.getElementById("videoCallBtn").addEventListener("click", () => startCall(true));
@@ -487,11 +510,12 @@ document.getElementById("audioCallBtn").addEventListener("click", () => startCal
 async function startCall(video) {
     if (!currentPeerUser) return;
     closeCallUI();
+    await new Promise(r => setTimeout(r, 200));
 
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+        localStream = await getCameraAndMic(video);
         isCamOn = video;
-        await attachStreamToVideo("localVideo", localStream, true);
+        await bindVideoElement("localVideo", localStream, true);
 
         resetCallButtonsUI(video);
         document.getElementById("callPeerName").textContent = `@${currentPeerUser}`;
@@ -521,9 +545,15 @@ function handleIncomingCall(call) {
     document.getElementById("callOverlay").classList.remove("hidden");
 
     document.getElementById("acceptCallBtn").onclick = async () => {
-        localStream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+        if (localStream) {
+            localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+        }
+        await new Promise(r => setTimeout(r, 200));
+
+        localStream = await getCameraAndMic(video);
         isCamOn = video;
-        await attachStreamToVideo("localVideo", localStream, true);
+        await bindVideoElement("localVideo", localStream, true);
 
         call.answer(localStream);
         document.getElementById("incomingCallControls").classList.add("hidden");
@@ -542,7 +572,7 @@ function wireCall(call, type) {
     let sec = 0;
 
     call.on("stream", async remote => {
-        await attachStreamToVideo("remoteVideo", remote, false);
+        await bindVideoElement("remoteVideo", remote, false);
         clearInterval(callTimerInterval);
         callTimerInterval = setInterval(() => {
             sec++;
@@ -568,50 +598,34 @@ document.getElementById("toggleMicBtn").addEventListener("click", e => {
     e.currentTarget.style.background = track.enabled ? "rgba(255, 255, 255, 0.1)" : "#ef4444";
 });
 
-// Zero-Black-Screen Camera Toggle (Swaps between live camera and smooth avatar canvas stream)
+// Non-Destructive Camera Toggle (Never stops WebRTC stream; instant ON/OFF without black screen)
 document.getElementById("toggleCamBtn").addEventListener("click", async e => {
     const btn = e.currentTarget;
     if (!localStream) return;
 
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (!videoTrack) {
+        alert("Audio-only call active.");
+        return;
+    }
+
+    isCamOn = !isCamOn;
+    videoTrack.enabled = isCamOn;
+
+    const localVid = document.getElementById("localVideo");
     if (isCamOn) {
-        // Turn Camera OFF cleanly using Avatar Canvas Track
-        localStream.getVideoTracks().forEach(t => t.stop());
-        const pausedStream = createAvatarStream();
-        const pausedTrack = pausedStream.getVideoTracks()[0];
-
-        const audioTracks = localStream.getAudioTracks();
-        localStream = new MediaStream([...audioTracks, pausedTrack]);
-        await attachStreamToVideo("localVideo", localStream, true);
-
-        if (activeMediaCall?.peerConnection) {
-            const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track?.kind === "video");
-            if (sender) await sender.replaceTrack(pausedTrack);
-        }
-
-        isCamOn = false;
+        localVid.style.opacity = "1";
+        await localVid.play().catch(() => {});
+        btn.textContent = "📷";
+        btn.style.background = "rgba(255, 255, 255, 0.1)";
+    } else {
+        localVid.style.opacity = "0.15";
         btn.textContent = "🚫";
         btn.style.background = "#ef4444";
-    } else {
-        // Turn Camera ON with fresh hardware stream + cloned video element
-        try {
-            const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const liveTrack = camStream.getVideoTracks()[0];
+    }
 
-            const audioTracks = localStream.getAudioTracks();
-            localStream = new MediaStream([...audioTracks, liveTrack]);
-            await attachStreamToVideo("localVideo", localStream, true);
-
-            if (activeMediaCall?.peerConnection) {
-                const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track?.kind === "video");
-                if (sender) await sender.replaceTrack(liveTrack);
-            }
-
-            isCamOn = true;
-            btn.textContent = "📷";
-            btn.style.background = "rgba(255, 255, 255, 0.1)";
-        } catch (err) {
-            alert("Camera could not turn on: " + err.message);
-        }
+    if (currentPeerUser) {
+        sendPacket(currentPeerUser, { type: "cam-state", enabled: isCamOn });
     }
 });
 
@@ -623,7 +637,7 @@ document.getElementById("shareScreenBtn").addEventListener("click", async () => 
         const screenTrack = screenStream.getVideoTracks()[0];
         const sender = activeMediaCall.peerConnection.getSenders().find(s => s.track?.kind === "video");
         if (sender) await sender.replaceTrack(screenTrack);
-        await attachStreamToVideo("localVideo", screenStream, true);
+        await bindVideoElement("localVideo", screenStream, true);
     } catch {}
 });
 
@@ -644,13 +658,22 @@ function resetCallButtonsUI(video) {
 function closeCallUI() {
     clearInterval(callTimerInterval);
     if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
+        localStream.getTracks().forEach(t => {
+            t.enabled = false;
+            t.stop();
+        });
         localStream = null;
     }
     const localVid = document.getElementById("localVideo");
     const remoteVid = document.getElementById("remoteVideo");
-    if (localVid) localVid.srcObject = null;
-    if (remoteVid) remoteVid.srcObject = null;
+    if (localVid) {
+        localVid.pause();
+        localVid.srcObject = null;
+    }
+    if (remoteVid) {
+        remoteVid.pause();
+        remoteVid.srcObject = null;
+    }
 
     activeMediaCall = null;
     document.getElementById("callOverlay").classList.add("hidden");
